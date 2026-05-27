@@ -72,8 +72,10 @@ Matrix NeuralNetwork::calculateBCEGradient(const Matrix& predictions, const Matr
             y_pred = std::max(epsilon, std::min(1.0 - epsilon, y_pred));
 
             // Đạo hàm thuần của Binary Cross Entropy dL/dY = (p - y) / (p * (1 - p))
-            // Lưu ý: Thường tầng cuối sẽ kết hợp với lớp Activation như Sigmoid thì đạo hàm sẽ triệt tiêu đi mẫu số
-            gradient(i, j) = - (y_true / y_pred) + ((1.0 - y_true) / (1.0 - y_pred));
+            // Để tránh lỗi chia cho 0 và NaN khi kết hợp với Sigmoid backward, 
+            // ta gộp tử số thành (p - y) và chặn mẫu số bằng epsilon.
+            double denominator = std::max(y_pred * (1.0 - y_pred), epsilon);
+            gradient(i, j) = (y_pred - y_true) / denominator;
             
             // Chia cho độ lớn batch để bình chuẩn hóa gradient
             gradient(i, j) /= batch_size;
