@@ -14,7 +14,7 @@
 5. [Quy tắc quản lý Kho lưu trữ (Repository Rules)](#quy-tắc-quản-lý-kho-lưu-trữ-repository-rules)
 6. [Quy trình Đóng góp & Duyệt Code (Contributing)](#quy-trình-đóng-góp--duyệt-code-contributing)
 7. [Thành viên & Vai trò (Team Members)](#thành-viên--vai-trò-team-members)
-8. [Giấy phép (License)](#giấy-phép-license)
+8. [Giấy phép (License) và Nguồn dữ liệu (DataSource)](#giấy-phép-license)
 
 ---
 
