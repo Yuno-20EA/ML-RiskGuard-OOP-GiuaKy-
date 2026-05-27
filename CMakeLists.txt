@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.20)
 project(RiskGuard VERSION 2.0.0 LANGUAGES CXX)
 
 # ════════════════════════════════════════════════
-#  Chuẩn C++20 — Chốt, không fallback
 #  Tận dụng: std::span, Concepts, std::format
 # ════════════════════════════════════════════════
 set(CMAKE_CXX_STANDARD 20)
