@@ -10,16 +10,18 @@
 #define CYAN        "\033[36m"  
 
 void Dashboard::drawHeader() {
-    std::cout << CYAN << BOLD;
-    std::cout << "╔══════════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║    ____  _     _      ____                       _       ║" << std::endl;
-    std::cout << "║   |  _ \\(_)___| | __ / ___|_   _  __ _ _ __   __| |      ║" << std::endl;
-    std::cout << "║   | |_) | / __| |/ /| |  _| | | |/ _` | '__| / _` |      ║" << std::endl;
-    std::cout << "║   |  _ <| \\__ \\   < | |_| | |_| | (_| | |   | (_| |      ║" << std::endl;
-    std::cout << "║   |_| \\_\\_|___/_|\\_\\ \\____|\\__,_|\\__,_|_|    \\__,_|      ║" << std::endl;
-    std::cout << "║                CORE ML RISK MANAGEMENT SYSTEM                ║" << std::endl;
-    std::cout << "╚══════════════════════════════════════════════════════════════╝" << RESET << std::endl;
-}
+     std::cout << CYAN << BOLD;
+        std::cout << "  _______________________________________________________________" << std::endl;
+        std::cout << " |                                                               |" << std::endl;
+        std::cout << " |   ____  ___  ____  _  __  ____ _   _  ____  ____  ____        |" << std::endl;
+        std::cout << " |  |  _ \\|_ _|/ ___|| |/ / / ___| | | |/ ___||  _ \\|  _ \\       |" << std::endl;
+        std::cout << " |  | |_) || | \\___ \\| ' < | |  _| | | |\\___ \\| |_) | | | |      |" << std::endl;
+        std::cout << " |  |  _ < | |  ___) | . \\ | |_| | |_| | ___) |  _ <| |_| |      |" << std::endl;
+        std::cout << " |  |_| \\_\\___||____/|_|\\_\\ \\____|\\___/|____/|_| \\_\\____/       |" << std::endl;
+        std::cout << " |                                                               |" << std::endl;
+        std::cout << " |                CORE ML RISK MANAGEMENT SYSTEM                 |" << std::endl;
+        std::cout << " |_______________________________________________________________|" << RESET << std::endl;
+    }
 
 void Dashboard::showMenu() {
     drawHeader();
