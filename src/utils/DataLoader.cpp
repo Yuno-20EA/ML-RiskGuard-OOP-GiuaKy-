@@ -8,6 +8,7 @@
 Matrix DataLoader::loadAndNormalize(const std::string& filename) {
     std::ifstream file(filename);
     
+    // Kiểm tra xem file có tồn tại và mở được không
     if (!file.is_open()) {
         std::cerr << "Lỗi: Không thể mở file " << filename << std::endl;
         return Matrix(0, 0); 
@@ -16,16 +17,18 @@ Matrix DataLoader::loadAndNormalize(const std::string& filename) {
     std::vector<std::vector<double>> rawData;
     std::string line, val;
 
+    // Đọc từng dòng của file CSV
     while (std::getline(file, line)) { 
         if (line.empty()) continue; 
         
         std::stringstream ss(line);
         std::vector<double> row;
+        // Tách các giá trị dựa trên dấu phẩy
         while (std::getline(ss, val, ',')) {
             try {
-                row.push_back(std::stod(val));
+                row.push_back(std::stod(val)); // Chuyển đổi chuỗi sang số thực
             } catch (const std::exception& e) {
-                row.push_back(0.0); 
+                row.push_back(0.0); // Nếu lỗi định dạng, gán giá trị mặc định là 0
             }
         }
         if (!row.empty()) {
@@ -43,7 +46,9 @@ Matrix DataLoader::loadAndNormalize(const std::string& filename) {
     int cols = rawData[0].size();
     Matrix result(rows, cols);
 
+    // Thực hiện chuẩn hóa theo từng cột (Feature Scaling)
     for (int j = 0; j < cols; ++j) { 
+        // Tìm giá trị nhỏ nhất và lớn nhất của cột để tính toán Min-Max
         double minVal = rawData[0][j];
         double maxVal = rawData[0][j];
         
@@ -52,10 +57,11 @@ Matrix DataLoader::loadAndNormalize(const std::string& filename) {
             maxVal = std::max(maxVal, rawData[i][j]);
         }
 
+        // Áp dụng công thức chuẩn hóa: (x - min) / (max - min)
         for (int i = 0; i < rows; ++i) {
             double normalizedVal = (maxVal == minVal) ? 0.0 : (rawData[i][j] - minVal) / (maxVal - minVal);
             result.at(i, j) = normalizedVal; 
         }
     }
-    return result;
+    return result; 
 }
