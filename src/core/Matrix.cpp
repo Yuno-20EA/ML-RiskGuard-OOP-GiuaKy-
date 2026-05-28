@@ -1,5 +1,7 @@
 #include "riskguard/core/Matrix.hpp"
 #include <stdexcept>
+#include <execution>
+#include <algorithm>
 
 namespace riskguard {
 
@@ -48,12 +50,16 @@ Matrix Matrix::multiply(const Matrix& other) const {
     }
 
     Matrix result(rows, other.cols, 0.0);
+    double* res_ptr = result.data.data();
+    const double* a_ptr = this->data.data();
+    const double* b_ptr = other.data.data();
+    
     // Yêu cầu 1: Tối ưu hóa CPU Cache bằng cách duyệt theo thứ tự i, k, j
     for (int i = 0; i < rows; ++i) {
         for (int k = 0; k < cols; ++k) {
-            double temp = this->operator()(i, k);
+            double temp = a_ptr[i * cols + k];
             for (int j = 0; j < other.cols; ++j) {
-                result(i, j) += temp * other(k, j);
+                res_ptr[i * other.cols + j] += temp * b_ptr[k * other.cols + j];
             }
         }
     }
@@ -102,10 +108,75 @@ Matrix Matrix::elementwiseMultiply(const Matrix& other) const {
 
     Matrix result(rows, cols);
     // Duyệt qua mảng phẳng 1 chiều (tối ưu nhất cho Hadamard product)
-    for (size_t i = 0; i < data.size(); ++i) {
-        result.data[i] = data[i] * other.data[i];
-    }
+    std::transform(std::execution::par_unseq,
+                   data.begin(), data.end(),
+                   other.data.begin(),
+                   result.data.begin(),
+                   std::multiplies<double>());
     return result;
+}
+
+void Matrix::gemm(const Matrix& A, const Matrix& B, Matrix& C, bool transA, bool transB) {
+    int a_rows = transA ? A.cols : A.rows;
+    int a_cols = transA ? A.rows : A.cols;
+    int b_rows = transB ? B.cols : B.rows;
+    int b_cols = transB ? B.rows : B.cols;
+
+    if (a_cols != b_rows) {
+        throw std::runtime_error("Matrix gemm error: inner dimensions must match");
+    }
+    if (C.rows != a_rows || C.cols != b_cols) {
+        throw std::runtime_error("Matrix gemm error: C dimensions must match result dimensions");
+    }
+
+    const double* a_ptr = A.data.data();
+    const double* b_ptr = B.data.data();
+    double* c_ptr = C.data.data();
+
+    // Để tối ưu cho các trường hợp cụ thể của ML (thường là transA hoặc transB)
+    if (!transA && !transB) {
+        // C = A * B
+        for (int i = 0; i < a_rows; ++i) {
+            for (int k = 0; k < a_cols; ++k) {
+                double temp = a_ptr[i * a_cols + k];
+                for (int j = 0; j < b_cols; ++j) {
+                    c_ptr[i * b_cols + j] += temp * b_ptr[k * b_cols + j];
+                }
+            }
+        }
+    } else if (transA && !transB) {
+        // C = A^T * B
+        for (int k = 0; k < a_rows; ++k) {
+            for (int i = 0; i < a_cols; ++i) {
+                double temp = a_ptr[k * a_cols + i];
+                for (int j = 0; j < b_cols; ++j) {
+                    c_ptr[i * b_cols + j] += temp * b_ptr[k * b_cols + j];
+                }
+            }
+        }
+    } else if (!transA && transB) {
+        // C = A * B^T
+        for (int i = 0; i < a_rows; ++i) {
+            for (int j = 0; j < b_cols; ++j) {
+                double sum = 0.0;
+                for (int k = 0; k < a_cols; ++k) {
+                    sum += a_ptr[i * a_cols + k] * b_ptr[j * b_cols + k];
+                }
+                c_ptr[i * b_cols + j] += sum;
+            }
+        }
+    } else {
+        // C = A^T * B^T
+        for (int i = 0; i < a_rows; ++i) {
+            for (int j = 0; j < b_cols; ++j) {
+                double sum = 0.0;
+                for (int k = 0; k < a_cols; ++k) {
+                    sum += a_ptr[k * a_cols + i] * b_ptr[j * b_cols + k];
+                }
+                c_ptr[i * b_cols + j] += sum;
+            }
+        }
+    }
 }
 
 } // namespace riskguard

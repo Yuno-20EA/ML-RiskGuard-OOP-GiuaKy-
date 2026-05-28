@@ -12,16 +12,6 @@
 
 namespace riskguard {
 
-// ── C++20 Concept: Đảm bảo kiểu T có interface của Layer ─────
-// Được dùng bởi NeuralNetwork::add_layer() để validate tĩnh
-template<typename T>
-concept LayerLike = requires(T layer, const Matrix& m, double lr) {
-    { layer.forward(m)                  } -> std::same_as<Matrix>;
-    { layer.backward(m)                 } -> std::same_as<Matrix>;
-    { layer.get_parameters()            } -> std::same_as<std::vector<Matrix*>>;
-    { layer.update_parameters(lr)       } -> std::same_as<void>;
-    { layer.get_type_name()             } -> std::same_as<std::string>;
-};
 
 // ── Abstract Base Class ───────────────────────────────────────
 class Layer {

@@ -40,6 +40,9 @@ public:
     std::vector<double>& get_data() { return data; }
     const std::vector<double>& get_data() const { return data; }
 
+    // BLAS-like C = op(A) * op(B)
+    static void gemm(const Matrix& A, const Matrix& B, Matrix& C, bool transA = false, bool transB = false);
+
 private:
     int rows;
     int cols;
