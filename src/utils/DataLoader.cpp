@@ -4,11 +4,16 @@
 #include <sstream>
 #include <algorithm>
 #include <iostream>
+#include <limits> // Cần để lấy giá trị cực đại/cực tiểu làm mốc
 
+/**
+ * @brief Đọc file CSV và chuẩn hóa dữ liệu về khoảng [0, 1].
+ * Lưu ý: Hàm này tự động bỏ qua dòng đầu tiên (header) và 
+ * có cơ chế chống crash khi dữ liệu không đồng nhất.
+ */
 Matrix DataLoader::loadAndNormalize(const std::string& filename) {
     std::ifstream file(filename);
     
-    // Kiểm tra xem file có tồn tại và mở được không
     if (!file.is_open()) {
         std::cerr << "Lỗi: Không thể mở file " << filename << std::endl;
         return Matrix(0, 0); 
@@ -16,51 +21,55 @@ Matrix DataLoader::loadAndNormalize(const std::string& filename) {
 
     std::vector<std::vector<double>> rawData;
     std::string line, val;
+    bool isHeader = true; // Cờ đánh dấu để bỏ qua dòng tiêu đề
 
-    // Đọc từng dòng của file CSV
     while (std::getline(file, line)) { 
         if (line.empty()) continue; 
         
+        // Bỏ qua dòng đầu tiên vì thường là tên cột (string không thể convert sang double)
+        if (isHeader) { isHeader = false; continue; }
+        
         std::stringstream ss(line);
         std::vector<double> row;
-        // Tách các giá trị dựa trên dấu phẩy
         while (std::getline(ss, val, ',')) {
             try {
-                row.push_back(std::stod(val)); // Chuyển đổi chuỗi sang số thực
+                row.push_back(std::stod(val));
             } catch (const std::exception& e) {
-                row.push_back(0.0); // Nếu lỗi định dạng, gán giá trị mặc định là 0
+                row.push_back(0.0); // Giá trị mặc định nếu dữ liệu hỏng
             }
         }
-        if (!row.empty()) {
-            rawData.push_back(row);
-        }
+        if (!row.empty()) rawData.push_back(row);
     }
     file.close();
 
-    if (rawData.empty()) {
-        std::cerr << "Lỗi: File CSV không có dữ liệu!" << std::endl;
-        return Matrix(0, 0);
-    }
+    if (rawData.empty()) return Matrix(0, 0);
 
     int rows = rawData.size();
-    int cols = rawData[0].size();
+    // Giả định số cột dựa trên dòng đầu tiên có dữ liệu
+    int cols = rawData[0].size(); 
     Matrix result(rows, cols);
 
-    // Thực hiện chuẩn hóa theo từng cột (Feature Scaling)
+    // Chuẩn hóa theo từng cột (Feature Scaling)
     for (int j = 0; j < cols; ++j) { 
-        // Tìm giá trị nhỏ nhất và lớn nhất của cột để tính toán Min-Max
-        double minVal = rawData[0][j];
-        double maxVal = rawData[0][j];
+        // Dùng giới hạn của double để tìm min/max chính xác
+        double minVal = std::numeric_limits<double>::max();
+        double maxVal = std::numeric_limits<double>::lowest();
         
-        for (int i = 1; i < rows; ++i) {
-            minVal = std::min(minVal, rawData[i][j]);
-            maxVal = std::max(maxVal, rawData[i][j]);
+        // Kiểm tra an toàn: Duyệt qua các hàng và kiểm tra size để tránh out-of-bounds
+        for (int i = 0; i < rows; ++i) {
+            if (j < rawData[i].size()) {
+                minVal = std::min(minVal, rawData[i][j]);
+                maxVal = std::max(maxVal, rawData[i][j]);
+            }
         }
 
-        // Áp dụng công thức chuẩn hóa: (x - min) / (max - min)
+        // Thực hiện chuẩn hóa Min-Max: (x - min) / (max - min)
         for (int i = 0; i < rows; ++i) {
-            double normalizedVal = (maxVal == minVal) ? 0.0 : (rawData[i][j] - minVal) / (maxVal - minVal);
-            result.at(i, j) = normalizedVal; 
+            if (j < rawData[i].size()) {
+                // Kiểm tra (maxVal == minVal) để tránh lỗi chia 0
+                double normalizedVal = (maxVal == minVal) ? 0.0 : (rawData[i][j] - minVal) / (maxVal - minVal);
+                result.at(i, j) = normalizedVal; 
+            }
         }
     }
     return result; 
