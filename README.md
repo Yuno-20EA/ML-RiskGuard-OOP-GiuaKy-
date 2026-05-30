@@ -12,7 +12,7 @@ Dự án sở hữu nhiều điểm kỹ thuật ấn tượng, thể hiện tư
 2. **Thuật toán GEMM (General Matrix Multiply) Mini:** Phép nhân ma trận được viết tay, hỗ trợ tính toán *in-place* với cờ `transposeA` và `transposeB`, giảm thiểu việc khởi tạo vùng nhớ tạm thời trong quá trình backpropagation.
 3. **Zero-copy Array Access:** Lấy dữ liệu từng hàng ma trận hoàn toàn không tốn chi phí copy nhờ `std::span`.
 4. **Gradient Clipping & Numerical Stability:** Áp dụng `epsilon = 1e-15` để chống lỗi `NaN` khi tính đạo hàm Binary Cross Entropy, kết hợp chặn trần đạo hàm để tránh bùng nổ gradient.
-5. **Xử lý đa luồng tự động:** Khai thác tập lệnh vector hóa (SIMD) của CPU bằng `std::execution::par_unseq`.
+5. **Numerical Stability:** Áp dụng `epsilon = 1e-15` để chống `NaN` khi tính đạo hàm BCE, gradient clipping ngăn bùng nổ gradient. `std::execution::par_unseq` đã được loại bỏ để đảm bảo tương thích trên MinGW/Windows.
 
 ---
 
@@ -160,15 +160,54 @@ Chương trình sẽ đọc chuỗi ký tự, tìm kiếm các khóa `"rows"` v�
 
 ```text
 ML_Guard_OOP_GiuaKy/
-├── CMakeLists.txt              # Cấu hình C++20 và Compiler target
-├── README.md                   # Tài liệu thiết kế hệ thống
-├── include/riskguard/          # Header files
-│   ├── core/                   # Cốt lõi toán học (Matrix, Layer ABC)
-│   ├── layers/                 # Các tầng mạng nơ-ron
-│   └── utils/                  # Công cụ chuẩn hóa và UI Dashboard
-├── src/                        # Implementation files (.cpp)
-├── tests/                      # Testing Framework
-└── data/                       # Dữ liệu tài chính
+├── CMakeLists.txt                      # Cấu hình C++20, build targets, linker flags
+├── README.md                           # Tài liệu thiết kế hệ thống
+├── .gitignore                          # Production-grade: loại trừ build/, binaries, data raw
+│
+├── include/                            # Public API headers (.hpp only)
+│   └── riskguard/
+│       ├── core/
+│       │   ├── Layer.hpp               # Abstract Base Class (ABC) — Tính Trừu Tượng
+│       │   └── Matrix.hpp              # Flat memory matrix, GEMM, std::span
+│       ├── layers/
+│       │   ├── LinearLayer.hpp         # Fully connected layer (weights + biases)
+│       │   └── SigmoidLayer.hpp        # Sigmoid activation với numerical clamping
+│       ├── network/
+│       │   └── NeuralNetwork.hpp       # Forward / Backward / BCE Loss
+│       └── utils/
+│           ├── Dashboard.hpp           # Terminal UI — hiển thị training progress
+│           └── DataLoader.hpp          # CSV reader, Min-Max normalization
+│
+├── src/                                # Implementation files (mirror include/)
+│   ├── core/
+│   │   └── Matrix.cpp                  # GEMM fix (transA/transB), zero-copy span
+│   ├── layers/
+│   │   ├── LinearLayer.cpp             # He initialization, gradient accumulation
+│   │   └── SigmoidLayer.cpp            # Sigmoid forward/backward
+│   ├── network/
+│   │   └── NeuralNetwork.cpp           # Pipeline orchestration, BCE gradient
+│   └── utils/
+│       ├── Dashboard.cpp               # ANSI color output, progress bar
+│       └── DataLoader.cpp              # File parsing, normalization
+│
+├── app/
+│   └── main.cpp                        # Entry point: step-by-step pipeline + Dashboard UI
+│
+├── tests/                              # Unit Testing Framework (tự viết, không dùng thư viện ngoài)
+│   ├── main.cpp                        # Test runner entry point (đăng ký & chạy test cases)
+│   ├── logger.hpp                      # Performance profiler (High Resolution Clock)
+│   ├── test_runner.hpp                 # TestCase ABC + TestRunner Singleton + Assert macros
+│   ├── test_matrix.cpp                 # 3 test cases: multiply, broadcasting, transpose
+│   ├── test_layers.cpp                 # 3 test cases: sigmoid, linear forward, BCE gradient
+│   └── test_csv_reader.cpp             # 2 test cases: file not found, min-max scaler
+│
+├── data/
+│   ├── dataset.csv                     # Processed data (28,638 records, 5 features)
+│   └── raw/
+│       └── credit_risk_dataset_raw.csv # Raw data gốc — Nguồn: Kaggle.com
+│
+└── scripts/
+    └── process_data.py                 # Tiền xử lý CSV: làm sạch, encode, normalize
 ```
 
 ## 🛠️ Hướng Dẫn Cài Đặt (Installation)
@@ -199,20 +238,33 @@ cmake --build . --target riskguard_tests
 Dưới đây là ví dụ minh họa cách khởi tạo pipeline đọc dữ liệu từ file CSV, đưa vào mạng nơ-ron huấn luyện:
 
 ```cpp
-#include "riskguard/NeuralNetwork.hpp"
+#include "riskguard/network/NeuralNetwork.hpp"
 #include "riskguard/utils/DataLoader.hpp"
+#include "riskguard/layers/LinearLayer.hpp"
+#include "riskguard/layers/SigmoidLayer.hpp"
+#include <memory>
+
+using namespace riskguard;
 
 int main() {
-    // 1. Khởi tạo mạng Nơ-ron cấu hình tuyến tính
-    NeuralNetwork net(0.01); // Learning rate = 0.01
+    // 1. Tải & chuẩn hóa dữ liệu từ CSV
+    DataLoader loader;
+    Matrix data = loader.loadAndNormalize("../data/dataset.csv");
+
+    // 2. Khởi tạo mạng Nơ-ron (kiến trúc 4 → 8 → 1)
+    NeuralNetwork net;
     net.add_layer(std::make_unique<LinearLayer>(4, 8));
     net.add_layer(std::make_unique<SigmoidLayer>());
     net.add_layer(std::make_unique<LinearLayer>(8, 1));
     net.add_layer(std::make_unique<SigmoidLayer>());
 
-    // 2. Chạy Dashboard hoặc DataLoader tại đây...
-    // net.train(X_norm, y, 1000); 
-    
+    // 3. Training loop (10 epochs, lr = 0.01)
+    for (int epoch = 1; epoch <= 10; ++epoch) {
+        Matrix pred = net.forward(data);
+        Matrix grad = net.calculateBCEGradient(pred, labels);
+        net.backward(grad);
+        net.update_parameters(0.01);
+    }
     return 0;
 }
 ```
