@@ -74,7 +74,7 @@ int main() {
             net.update_parameters(learning_rate);
             
             Dashboard::showTrainingProgress(epoch, epochs, loss);
-            simulate_delay(800); // Tạm dừng để Dev nhìn rõ từng epoch
+            simulate_delay(800); // Tạm dừng nhìn rõ từng epoch
         }
         
         simulate_delay(1500);
