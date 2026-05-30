@@ -1,0 +1,93 @@
+# ==============================================================================
+# RiskGuard ML Framework - Production-Grade .gitignore (
+# ==============================================================================
+
+# 1. Hệ thống Biên dịch & Cấu hình (CMake & Build Artifacts)
+# ------------------------------------------------------------------------------
+build/
+Build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+*.cmake
+Makefile
+*.json
+!CMakePresets.json
+!package.json
+
+# 2. Thư mục Thần tảng & Thư viện (Compiled Objects & Libraries)
+# ------------------------------------------------------------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# 3. Cấu hình IDE & Trình soạn thảo (IDEs & Editors)
+# ------------------------------------------------------------------------------
+# CLion / JetBrains
+.idea/
+*.iws
+*.iml
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln
+*.vcxproj
+*.filters
+
+# 4. Quản lý Dữ liệu & Trọng số Mô hình 
+# Đảm bảo nguyên tắc bảo mật: Không đẩy tập dữ liệu lớn và trọng số thô lên Github
+# ------------------------------------------------------------------------------
+data/raw/*
+data/weights/*
+*.csv
+*.tsv
+*.bin
+*.dat
+*.npy
+*.npz
+*.h5
+*.hdf5
+
+# Ngoại lệ: Giữ cấu hình cấu trúc thư mục data nhưng bỏ trống dữ liệu bên trong
+!data/
+!data/raw/
+!data/weights/
+!data/**/.gitkeep
+
+# 5. Phân tích Hiệu năng & Nhật ký (Profiling & Logs)
+# Tránh ô nhiễm Repo khi Hiếu chạy TestRunner và đo hiệu năng bộ nhớ
+# ------------------------------------------------------------------------------
+*.log
+logs/
+reports/
+gmon.out
+*.profraw
+*.profdata
+*.gcov
+*.gcda
+*.gcno
+
+# 6. Tệp tin rác của Hệ điều hành (OS Junk)
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
