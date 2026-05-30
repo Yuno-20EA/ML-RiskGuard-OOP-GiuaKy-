@@ -70,6 +70,7 @@ data/weights/*
 # Ngoại lệ: Giữ cấu hình cấu trúc thư mục data nhưng bỏ trống dữ liệu bên trong
 !data/
 !data/raw/
+!data/raw/*.csv
 !data/weights/
 !data/**/.gitkeep
 

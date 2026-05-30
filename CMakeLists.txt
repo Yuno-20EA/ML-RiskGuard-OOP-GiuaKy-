@@ -41,7 +41,7 @@ set(RISKGUARD_SOURCES
     src/layers/SigmoidLayer.cpp
 
     # Network
-    src/NeuralNetwork.cpp
+    src/network/NeuralNetwork.cpp
 
     # Utils — Data Pipeline & Tooling
     src/utils/Dashboard.cpp
@@ -91,13 +91,14 @@ if(RISKGUARD_BUILD_TESTS)
     enable_testing()
 
     set(RISKGUARD_TEST_SOURCES
-        src/main.cpp
+        tests/main.cpp
     )
 
     add_executable(riskguard_tests ${RISKGUARD_TEST_SOURCES})
     target_link_libraries(riskguard_tests PRIVATE riskguard_lib)
+    target_include_directories(riskguard_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(riskguard_tests PRIVATE
-        RISKGUARD_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data/raw"
+        RISKGUARD_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
     )
 
     add_test(NAME AllTests COMMAND riskguard_tests)

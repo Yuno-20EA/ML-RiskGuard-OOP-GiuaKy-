@@ -1,5 +1,5 @@
-#include "../include/test_runner.hpp"
-#include "../include/logger.hpp"
+#include "test_runner.hpp"
+#include "logger.hpp"
 #include "../include/riskguard/layers/LinearLayer.hpp"
 #include "../include/riskguard/layers/SigmoidLayer.hpp"
 #include "../include/riskguard/NeuralNetwork.hpp"

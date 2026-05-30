@@ -1,4 +1,4 @@
-#include "riskguard/NeuralNetwork.hpp"
+#include "riskguard/network/NeuralNetwork.hpp"
 #include "riskguard/utils/DataLoader.hpp"
 #include "riskguard/utils/Dashboard.hpp"
 #include "riskguard/layers/LinearLayer.hpp"

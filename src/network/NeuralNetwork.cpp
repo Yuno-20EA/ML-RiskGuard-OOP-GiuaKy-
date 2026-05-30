@@ -1,4 +1,4 @@
-#include "riskguard/NeuralNetwork.hpp"
+#include "riskguard/network/NeuralNetwork.hpp"
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>

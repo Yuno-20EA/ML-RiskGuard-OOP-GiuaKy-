@@ -1,5 +1,5 @@
-#include "../include/test_runner.hpp"
-#include "../include/logger.hpp"
+#include "test_runner.hpp"
+#include "logger.hpp"
 #include "../include/riskguard/core/Matrix.hpp" // File của Hải (Trưởng nhóm)
 
 using namespace riskguard;
