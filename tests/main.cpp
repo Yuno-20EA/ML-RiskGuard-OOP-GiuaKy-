@@ -17,7 +17,7 @@
 // Do đó, trong bối cảnh Framework *tự chế* đơn giản này (không có auto-registration), việc `#include "test_*.cpp"` vào `tests/main.cpp` 
 // để tạo một "Unity Build" (Single Translation Unit) là cách duy nhất và hợp lý nhất để nó hoạt động mà không phải viết lại toàn bộ Framework test.
 
-// VÌ VẬY: Tôi sẽ giữ lại việc include .cpp, nhưng đây được coi là kỹ thuật "Unity Build" cho test runner.
+// VÌ VẬY: Hải sẽ giữ lại việc include .cpp, nhưng đây được coi là kỹ thuật Unity Build cho test runner.
 
 #include "test_matrix.cpp"
 #include "test_layers.cpp"
