@@ -2,7 +2,7 @@
 #include "logger.hpp"
 #include "../include/riskguard/layers/LinearLayer.hpp"
 #include "../include/riskguard/layers/SigmoidLayer.hpp"
-#include "../include/riskguard/NeuralNetwork.hpp"
+#include "../include/riskguard/network/NeuralNetwork.hpp"
 #include <cmath>
 #include <stdexcept>
 
