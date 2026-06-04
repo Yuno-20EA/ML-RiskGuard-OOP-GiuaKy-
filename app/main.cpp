@@ -57,44 +57,44 @@ static void run_cognitive_assessment(const std::vector<double>& features) {
     std::cout << "\n"
               << ansi::CYAN << ansi::BOLD
               << " ╔══════════════════════════════════════════════════╗\n"
-              << " ║           AI COGNITIVE ASSESSMENT                ║\n"
+              << " ║         HỆ THỐNG PHÂN TÍCH TÍN DỤNG AI           ║\n"
               << " ╚══════════════════════════════════════════════════╝"
               << ansi::RESET << "\n\n";
 
-    // ── Giai đoạn 1: Data Sanitization & Clipping ─────────────────────────
+    // ── Giai đoạn 1: Làm sạch & Kẹp biên dữ liệu ────────────────────────
     std::cout << ansi::YELLOW << ansi::BOLD
-              << " [PROCESSING] Data Sanitization & Clipping\n"
+              << " [XỬ LÝ]   Làm sạch & Kẹp biên dữ liệu đầu vào\n"
               << ansi::RESET;
-    render_progress_bar("[PROCESSING]", ansi::YELLOW, 20, 40);
+    render_progress_bar("[XU LY] ", ansi::YELLOW, 20, 40);
 
     // In kết quả Z-score đã làm sạch
-    const std::string labels[] = {"Income", "Debt  ", "Delinq", "Age   "};
-    std::cout << ansi::GRAY << "  ├─ Feature vector (Z-score clamped to [-3.0, 3.0]):\n";
+    const std::string labels[] = {"Thu nhap", "Du no  ", "Tre han", "Tuoi   "};
+    std::cout << ansi::GRAY << "  ├─ Vector đặc trưng (Z-score kẹp biên [-3.0, 3.0]):\n";
     for (std::size_t i = 0; i < features.size(); ++i) {
         std::cout << "  │   " << labels[i] << " = "
                   << ansi::YELLOW << std::fixed << std::setprecision(6)
                   << features[i] << ansi::RESET << "\n";
     }
-    std::cout << ansi::GRAY << "  └─ Sanitization complete.\n" << ansi::RESET << "\n";
+    std::cout << ansi::GRAY << "  └─ Làm sạch dữ liệu hoàn tất.\n" << ansi::RESET << "\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    // ── Giai đoạn 2: Matrix Propagation ───────────────────────────────────
+    // ── Giai đoạn 2: Lan truyền ma trận trọng số ─────────────────────────
     std::cout << ansi::CYAN << ansi::BOLD
-              << " [COMPUTING]  Matrix Propagation  (1×4 → 1×8)\n"
+              << " [TÍNH TOÁN] Lan truyền ma trận đặc trưng (1×4 → 1×8)\n"
               << ansi::RESET;
-    render_progress_bar("[COMPUTING] ", ansi::CYAN, 20, 35);
+    render_progress_bar("[TINH TOAN]", ansi::CYAN, 20, 35);
     std::cout << ansi::GRAY
-              << "  └─ Weight matrices multiplied across hidden layer.\n"
+              << "  └─ Ma trận trọng số lớp ẩn đã được nhân xong.\n"
               << ansi::RESET << "\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
-    // ── Giai đoạn 3: Neural Network Activation ────────────────────────────
+    // ── Giai đoạn 3: Kích hoạt đầu ra Sigmoid ────────────────────────────
     std::cout << ansi::MAGENTA << ansi::BOLD
-              << " [RESOLVING]  Neural Network Sigmoid Activation\n"
+              << " [KẾT LUẬN]  Kích hoạt hàm Sigmoid lớp đầu ra\n"
               << ansi::RESET;
-    render_progress_bar("[RESOLVING] ", ansi::MAGENTA, 20, 30);
+    render_progress_bar("[KET LUAN]", ansi::MAGENTA, 20, 30);
     std::cout << ansi::GRAY
-              << "  └─ Output neuron activated → probability in [0.0, 1.0].\n"
+              << "  └─ Xác suất đầu ra đã được ép về khoảng [0.0, 1.0].\n"
               << ansi::RESET << "\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
@@ -126,13 +126,17 @@ static void run_single_assessment(Dashboard& db, DataPipeline& pipeline, NeuralN
               << ansi::RESET;
 
     // Thu thập dữ liệu thô qua bộ giáp nhập liệu an toàn
-    double income      = db.getSafeDouble("  ▶ Thu nhập hàng năm  (VND, 0 - 1,000,000,000): ",
-                                          0.0, 1'000'000'000.0);
-    double debt        = db.getSafeDouble("  ▶ Tổng dư nợ         (VND, 0 - 1,000,000,000): ",
-                                          0.0, 1'000'000'000.0);
-    double delinquency = db.getSafeDouble("  ▶ Số lần trễ hạn     (0 - 100): ",
-                                          0.0, 100.0);
-    int    age         = db.getSafeInt   ("  ▶ Tuổi khách hàng    (18 - 100): ", 18, 100);
+    double income      = db.getSafeDouble(
+        "  ▶ Thu nhập hàng năm  (VND, 0 - 100.000.000.000): ",
+        0.0, 100'000'000'000.0);
+    double debt        = db.getSafeDouble(
+        "  ▶ Tổng dư nợ hiện tại (VND, 0 - 20.000.000.000): ",
+        0.0, 20'000'000'000.0);
+    double delinquency = db.getSafeDouble(
+        "  ▶ Số lần trễ hạn thanh toán (0 - 100): ",
+        0.0, 100.0);
+    int    age         = db.getSafeInt(
+        "  ▶ Tuổi khách hàng (1 - 200): ", 1, 200);
 
     // Chuẩn hóa Z-score + kẹp biên [-3.0, 3.0]
     std::vector<double> features = pipeline.transform(income, debt,
@@ -169,7 +173,7 @@ int main() {
                 run_single_assessment(db, pipeline, model);
             } else {
                 std::cout << "\n" << ansi::CYAN
-                          << "[SYSTEM] He thong da dong an toan. Tam biet!\n"
+                          << "[HE THONG] He thong da dong an toan. Hen gap lai!\n"
                           << ansi::RESET << "\n";
                 break;
             }

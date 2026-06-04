@@ -45,13 +45,13 @@ void Dashboard::drawHeader() const {
     std::cout << " |  |  _ < | |  ___) | . \\ | |_| | |_| | ___) |  _ <| |_| |       |" << std::endl;
     std::cout << " |  |_| \\_\\___||____/|_|\\_\\ \\____|\\___/|____/|_| \\_\\____/       |" << std::endl;
     std::cout << " |                                                               |" << std::endl;
-    std::cout << " |" << CYAN << "              CORE ML RISK MANAGEMENT SYSTEM                   " << MAGENTA << "|" << std::endl;
+    std::cout << " |" << CYAN << "              HỆ THỐNG QUẢN TRỊ RỦI RO LÕI ML                  " << MAGENTA << "|" << std::endl;
     std::cout << " |_______________________________________________________________|" << RESET << std::endl;
 }
 
 void Dashboard::showMenu(const std::vector<std::string>& options) const {
     drawHeader();
-    std::cout << "\n" << BOLD << CYAN << " ✧ SYSTEM CONTROL MENU ✧" << RESET << std::endl;
+    std::cout << "\n" << BOLD << CYAN << " ✧ MENU ĐIỀU KHIỂN HỆ THỐNG ✧" << RESET << std::endl;
     
     if (options.empty()) return;
 
@@ -82,38 +82,38 @@ void Dashboard::showMenu(const std::vector<std::string>& options) const {
     for(size_t k = 0; k < inner_width + 2; ++k) std::cout << "─";
     std::cout << "┘" << RESET << std::endl;
     
-    std::cout << "\n" << BOLD << CYAN << "⚡ COMMAND INPUT > " << RESET;
+    std::cout << "\n" << BOLD << CYAN << "⚡ NHẬP LỆNH > " << RESET;
 }
 
 void Dashboard::showTrainingProgress(int epoch, int totalEpochs, double loss) const {
     float progress = static_cast<float>(epoch) / totalEpochs;
     int barWidth = 40;
 
-    std::cout << "\r" << YELLOW << "TRAINING NEURAL LINK: " << RESET << "[";
+    std::cout << "\r" << YELLOW << "HUẤN LUYỆN MẠNG NƠ-RON: " << RESET << "[";
     int pos = static_cast<int>(barWidth * progress);
     for (int i = 0; i < barWidth; ++i) {
         if (i < pos) std::cout << CYAN << "■" << RESET;
         else std::cout << GRAY << "■" << RESET;
     }
     std::cout << "] " << CYAN << int(progress * 100.0) << "% " << RESET
-              << "| Loss: " << std::fixed << std::setprecision(4) << MAGENTA << loss << RESET << std::flush;
+              << "| Tổn thất: " << std::fixed << std::setprecision(4) << MAGENTA << loss << RESET << std::flush;
 
-    if (epoch == totalEpochs) std::cout << GREEN << " [NETWORK SYNCHRONIZED]" << RESET << std::endl;
+    if (epoch == totalEpochs) std::cout << GREEN << " [MẠNG ĐÃ ĐỒNG BỘ]" << RESET << std::endl;
 }
 
 void Dashboard::displayAssessmentCard(double riskProb, std::string_view mainReason) const {
-    std::string status = (riskProb < 0.5) ? "APPROVED (LOW RISK)" : "REJECTED (HIGH RISK)";
+    std::string status = (riskProb < 0.5) ? "PHÊ DUYỆT (RỦI RO THẤP)" : "TỪ CHỐI (RỦI RO CAO)";
     std::string color = (riskProb < 0.5) ? GREEN : RED;
 
     std::cout << "\n" << color << BOLD;
     std::cout << "┌──────────────────────────────────────────────────────────┐" << std::endl;
-    std::cout << "│                 CREDIT RISK EVALUATION                   │" << std::endl;
+    std::cout << "│                 ĐÁNH GIÁ RỦI RO TÍN DỤNG                 │" << std::endl;
     std::cout << "├──────────────────────────────────────────────────────────┤" << std::endl;
-    std::cout << "│  STATUS: " << std::left << std::setw(48) << status << "│" << std::endl;
-    std::cout << "│  RISK PROBABILITY: " << std::fixed << std::setprecision(2)
+    std::cout << "│  TRẠNG THÁI: " << std::left << std::setw(46) << status << "│" << std::endl;
+    std::cout << "│  XÁC SUẤT RỦI RO: " << std::fixed << std::setprecision(2)
               << (riskProb * 100) << "%" << std::setw(37) << " " << "│" << std::endl;
     std::cout << "├──────────────────────────────────────────────────────────┤" << std::endl;
-    std::cout << "│  REASON: " << std::left << std::setw(48) << std::string(mainReason) << "│" << std::endl;
+    std::cout << "│  LÝ DO: " << std::left << std::setw(49) << std::string(mainReason) << "│" << std::endl;
     std::cout << "└──────────────────────────────────────────────────────────┘" << RESET << std::endl;
 }
 
@@ -126,8 +126,8 @@ int Dashboard::getSafeInt(std::string_view prompt, int min_val, int max_val) con
         }
         std::cin.clear(); // Xóa cờ lỗi
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Loại bỏ các ký tự rác trong buffer
-        std::cout << RED << BOLD << "[ERROR] Invalid input. Please enter an integer between " 
-                  << min_val << " and " << max_val << "." << RESET << std::endl;
+        std::cout << RED << BOLD << "[LỖI] Dữ liệu không hợp lệ. Vui lòng nhập số nguyên từ " 
+                  << min_val << " đến " << max_val << "." << RESET << std::endl;
     }
 }
 
@@ -140,8 +140,8 @@ double Dashboard::getSafeDouble(std::string_view prompt, double min_val, double 
         }
         std::cin.clear();
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << RED << BOLD << "[ERROR] Invalid input. Please enter a number between " 
-                  << min_val << " and " << max_val << "." << RESET << std::endl;
+        std::cout << RED << BOLD << "[LỖI] Dữ liệu không hợp lệ. Vui lòng nhập số từ " 
+                  << min_val << " đến " << max_val << "." << RESET << std::endl;
     }
 }
 
