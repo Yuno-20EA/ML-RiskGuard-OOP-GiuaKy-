@@ -2,13 +2,31 @@
 #include <stdexcept>
 #include <algorithm>
 #include <execution>
+#include <random>
+#include <cmath>
 
 namespace riskguard {
 
 LinearLayer::LinearLayer(int input_dim, int output_dim) 
     : weights(input_dim, output_dim), biases(1, output_dim), 
       weights_gradient(input_dim, output_dim), biases_gradient(1, output_dim) {
-    // Lưu ý: Trong thực tế sẽ có hàm khởi tạo Xavier/He ở đây
+    
+    // Khởi tạo trọng số ngẫu nhiên theo phân phối chuẩn (Xavier/He style initialization)
+    // Giúp phá vỡ tính đối xứng của mạng và hội tụ nhanh hơn.
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    
+    // Variance = 1.0 / input_dim (Xavier đơn giản)
+    double stddev = std::sqrt(1.0 / input_dim);
+    std::normal_distribution<double> dist(0.0, stddev);
+
+    auto& w_data = weights.get_data();
+    for (double& w : w_data) {
+        w = dist(gen);
+    }
+    
+    // Biases thường được khởi tạo bằng 0
+    std::fill(biases.get_data().begin(), biases.get_data().end(), 0.0);
 }
 
 Matrix LinearLayer::forward(const Matrix& input) {

@@ -44,6 +44,7 @@ set(RISKGUARD_SOURCES
     src/utils/Dashboard.cpp
     src/utils/DataLoader.cpp
     src/utils/DataPipeline.cpp
+    src/utils/ModelManager.cpp
 
     # Network
     src/network/NeuralNetwork.cpp

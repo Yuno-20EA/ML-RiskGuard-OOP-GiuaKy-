@@ -185,6 +185,43 @@ public:
     }
 };
 
+// ============================================================
+//  Test Case 8 — Kiểm tra hàm DataPipeline::fit
+// ============================================================
+class DataPipelineFitTest : public TestCase {
+public:
+    DataPipelineFitTest() : TestCase("DataPipeline", "DataPipelineFitTest") {}
+    void run_logic() override {
+        // Ma trận 3 dòng, 5 cột (cột 5 là nhãn, fit() chỉ lấy 4 cột đầu)
+        Matrix raw(3, 5);
+        // Cột 0: Income (10, 20, 30) -> Mean=20, Std=8.1649...
+        raw(0,0) = 10; raw(1,0) = 20; raw(2,0) = 30;
+        // Cột 1: Debt (1, 1, 1) -> Mean=1, Std=0 -> Eps
+        raw(0,1) = 1; raw(1,1) = 1; raw(2,1) = 1;
+        // Cột 2: Delinquency (0, 1, 2) -> Mean=1, Std=0.81649
+        raw(0,2) = 0; raw(1,2) = 1; raw(2,2) = 2;
+        // Cột 3: Age (25, 30, 35) -> Mean=30, Std=4.08248
+        raw(0,3) = 25; raw(1,3) = 30; raw(2,3) = 35;
+
+        DataPipeline p;
+        p.fit(raw);
+        
+        // Income (pop_stddev)
+        OOP_ASSERT_NEAR(p.get_income_mean(), 20.0, 1e-5);
+        OOP_ASSERT_NEAR(p.get_income_std_dev(), 8.16496, 1e-5); // sqrt(200/3)
+        
+        // Debt (Std=0 -> Eps)
+        OOP_ASSERT_NEAR(p.get_debt_mean(), 1.0, 1e-5);
+        
+        // Transform test
+        auto f = p.transform(raw);
+        // Dòng 2, Cột 0: (20 - 20) / std = 0
+        OOP_ASSERT_NEAR(f(1, 0), 0.0, 1e-5);
+        // Dòng 3, Cột 3: (35 - 30) / 4.08248 = 1.2247
+        OOP_ASSERT_NEAR(f(2, 3), 1.22474, 1e-5);
+    }
+};
+
 // ── Main: Đăng ký toàn bộ Test Cases → Kích hoạt Runner ────────────────────
 int main() {
     Logger::log_info("He thong kiem thu tu dong khoi dong...");
@@ -206,6 +243,7 @@ int main() {
     runner.register_test(std::make_unique<RawCSVLoaderTest>());
 
     // Nhóm 4 — Pipeline Số học (Z-score & Clipping)
+    runner.register_test(std::make_unique<DataPipelineFitTest>());
     runner.register_test(std::make_unique<ZScoreAtMeanTest>());
     runner.register_test(std::make_unique<IncomeOutlierClampTest>());
     runner.register_test(std::make_unique<DelinquencyOutlierClampTest>());

@@ -23,6 +23,9 @@ public:
     // Trích xuất trọng số của lớp mạng đầu tiên để phục vụ XAI
     std::vector<Matrix*> get_first_layer_parameters() const;
 
+    // Trích xuất danh sách lớp mạng để phục vụ ModelManager
+    const std::vector<std::unique_ptr<Layer>>& get_layers() const { return layers; }
+
 private:
     std::vector<std::unique_ptr<Layer>> layers;
 };

@@ -86,20 +86,21 @@ void Dashboard::showMenu(const std::vector<std::string>& options) const {
     std::cout << "\n" << BOLD << CYAN << "⚡ NHẬP LỆNH > " << RESET;
 }
 
-void Dashboard::showTrainingProgress(int epoch, int totalEpochs, double loss) const {
+void Dashboard::showTrainingProgress(int epoch, int totalEpochs, double loss, double accuracy) const {
     float progress = static_cast<float>(epoch) / totalEpochs;
-    int barWidth = 40;
+    int barWidth = 35; // Rút ngắn một chút để đủ chỗ in accuracy
 
-    std::cout << "\r" << YELLOW << "HUẤN LUYỆN MẠNG NƠ-RON: " << RESET << "[";
+    std::cout << "\r" << YELLOW << "HUẤN LUYỆN: " << RESET << "[";
     int pos = static_cast<int>(barWidth * progress);
     for (int i = 0; i < barWidth; ++i) {
         if (i < pos) std::cout << CYAN << "■" << RESET;
         else std::cout << GRAY << "■" << RESET;
     }
     std::cout << "] " << CYAN << int(progress * 100.0) << "% " << RESET
-              << "| Tổn thất: " << std::fixed << std::setprecision(4) << MAGENTA << loss << RESET << std::flush;
+              << "| Loss: " << std::fixed << std::setprecision(4) << MAGENTA << loss << RESET 
+              << " | Acc: " << std::fixed << std::setprecision(2) << GREEN << (accuracy * 100.0) << "% " << RESET << std::flush;
 
-    if (epoch == totalEpochs) std::cout << GREEN << " [MẠNG ĐÃ ĐỒNG BỘ]" << RESET << std::endl;
+    if (epoch == totalEpochs) std::cout << GREEN << " [HOÀN TẤT]" << RESET << std::endl;
 }
 
 void Dashboard::displayAssessmentCard(double riskProb, std::string_view mainReason) const {

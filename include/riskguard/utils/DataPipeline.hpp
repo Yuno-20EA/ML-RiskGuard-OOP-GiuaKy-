@@ -20,6 +20,16 @@ public:
     void set_delinquency_params(double mean, double std_dev);
     void set_age_params(double mean, double std_dev);
 
+    // Lấy tham số phục vụ cho ModelManager
+    double get_income_mean() const { return income_mean; }
+    double get_income_std_dev() const { return income_std_dev; }
+    double get_debt_mean() const { return debt_mean; }
+    double get_debt_std_dev() const { return debt_std_dev; }
+    double get_delinquency_mean() const { return delinquency_mean; }
+    double get_delinquency_std_dev() const { return delinquency_std_dev; }
+    double get_age_mean() const { return age_mean; }
+    double get_age_std_dev() const { return age_std_dev; }
+
     // Chuẩn hóa Z-score có kẹp biên trong khoảng [-3.0, 3.0]
     // 1. Cho một khách hàng đơn lẻ
     std::vector<double> transform(double income, double debt,

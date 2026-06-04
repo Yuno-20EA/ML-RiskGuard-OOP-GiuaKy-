@@ -16,7 +16,7 @@ public:
     // Hệ thống Menu Động (Dynamic Menu System)
     void showMenu(const std::vector<std::string>& options) const;
     
-    void showTrainingProgress(int epoch, int totalEpochs, double loss) const;
+    void showTrainingProgress(int epoch, int totalEpochs, double loss, double accuracy) const;
     void displayAssessmentCard(double riskProb, std::string_view mainReason) const;
 
     // Bộ giáp phòng vệ nhập liệu (Safe Input Wrappers)

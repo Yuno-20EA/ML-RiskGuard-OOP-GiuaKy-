@@ -5,6 +5,7 @@
 #include "riskguard/utils/Dashboard.hpp"
 #include "riskguard/utils/DataPipeline.hpp"
 #include "riskguard/utils/DataLoader.hpp"
+#include "riskguard/utils/ModelManager.hpp"
 #include "riskguard/network/NeuralNetwork.hpp"
 #include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
@@ -142,6 +143,20 @@ static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, N
 
 // ── Khởi tạo & Huấn luyện mạng tự động ──────────────────────────────────────
 static void startup_training(Dashboard& db, NeuralNetwork& model, DataPipeline& pipeline) {
+#ifdef RISKGUARD_PROJECT_ROOT
+    std::string csv_path = std::string(RISKGUARD_PROJECT_ROOT) + "/data/dataset.csv";
+    std::string model_path = std::string(RISKGUARD_PROJECT_ROOT) + "/model.json";
+#else
+    std::string csv_path = "data/dataset.csv"; // Fallback cho trường hợp biên dịch thủ công
+    std::string model_path = "model.json";
+#endif
+
+    std::cout << ansi::YELLOW << "[HỆ THỐNG] Kiểm tra mô hình lưu trữ tại " << model_path << "..." << ansi::RESET << std::endl;
+    if (ModelManager::loadModel(model_path, model, pipeline)) {
+        std::cout << ansi::GREEN << "[HỆ THỐNG] Đã nạp thành công bộ trọng số và phân phối dữ liệu từ model.json. Bỏ qua huấn luyện!" << ansi::RESET << std::endl;
+        return;
+    }
+
     DataLoader loader;
 
     // Xây dựng đường dẫn tuyệt đối dùng macro từ CMake, tránh lỗi CWD
@@ -189,13 +204,41 @@ static void startup_training(Dashboard& db, NeuralNetwork& model, DataPipeline& 
         model.backward(gradient);
         model.update_parameters(learning_rate);
         
-        db.showTrainingProgress(epoch, epochs, loss);
+        // Tính Accuracy (Ngưỡng 0.5)
+        int correct = 0;
+        for (int i = 0; i < rows; ++i) {
+            int pred_class = (predictions(i, 0) >= 0.5) ? 1 : 0;
+            int target_class = (Y(i, 0) >= 0.5) ? 1 : 0;
+            if (pred_class == target_class) correct++;
+        }
+        double accuracy = static_cast<double>(correct) / rows;
+        
+        db.showTrainingProgress(epoch, epochs, loss, accuracy);
         std::this_thread::sleep_for(std::chrono::milliseconds(20)); // Delay nhỏ để thấy hiệu ứng
+    }
+
+    std::cout << ansi::YELLOW << "\n[HỆ THỐNG] Đang lưu mô hình..." << ansi::RESET << std::endl;
+    if (ModelManager::saveModel(model_path, model, pipeline)) {
+        std::cout << ansi::GREEN << "[HỆ THỐNG] Đã lưu mô hình thành công vào model.json." << ansi::RESET << std::endl;
     }
 }
 
 // ── Entry Point ──────────────────────────────────────────────────────────────
-int main() {
+int main(int argc, char** argv) {
+    // Xử lý tham số dòng lệnh --help
+    if (argc > 1) {
+        std::string arg = argv[1];
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "RiskGuard ML Framework v2.0\n\n"
+                      << "Cach su dung:\n"
+                      << "  riskguard [OPTIONS]\n\n"
+                      << "Options:\n"
+                      << "  -h, --help    Hien thi thong tin huong dan nay va thoat.\n\n"
+                      << "Chương trình sẽ tự động đọc data/dataset.csv để huấn luyện.\n";
+            return 0;
+        }
+    }
+
     try {
         Dashboard     db;
         NeuralNetwork model = build_network();
