@@ -63,7 +63,7 @@ static void run_cognitive_assessment(const std::vector<double>& features) {
               << " ╚══════════════════════════════════════════════════╝"
               << ansi::RESET << "\n\n";
 
-    // ── Giai đoạn 1: Làm sạch & Kẹp biên dữ liệu ────────────────────────
+    // ── Giai đoạn 1: Làm sạch & Kẹp biên dữ liệu (Sanitization) ─────────────
     std::cout << ansi::YELLOW << ansi::BOLD
               << " [XỬ LÝ]   Làm sạch & Kẹp biên dữ liệu đầu vào\n"
               << ansi::RESET;
@@ -80,7 +80,7 @@ static void run_cognitive_assessment(const std::vector<double>& features) {
     std::cout << ansi::GRAY << "  └─ Làm sạch dữ liệu hoàn tất.\n" << ansi::RESET << "\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    // ── Giai đoạn 2: Lan truyền ma trận trọng số ─────────────────────────
+    // ── Giai đoạn 2: Lan truyền ma trận trọng số (Propagation) ───────────────
     std::cout << ansi::CYAN << ansi::BOLD
               << " [TÍNH TOÁN] Lan truyền ma trận đặc trưng (1×4 → 1×8)\n"
               << ansi::RESET;
@@ -90,7 +90,7 @@ static void run_cognitive_assessment(const std::vector<double>& features) {
               << ansi::RESET << "\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
-    // ── Giai đoạn 3: Kích hoạt đầu ra Sigmoid ────────────────────────────
+    // ── Giai đoạn 3: Kích hoạt đầu ra Sigmoid (Activation) ───────────────────
     std::cout << ansi::MAGENTA << ansi::BOLD
               << " [KẾT LUẬN]  Kích hoạt hàm Sigmoid lớp đầu ra\n"
               << ansi::RESET;
@@ -136,7 +136,20 @@ static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, N
     run_cognitive_assessment(features);
 
     double risk_prob = RiskEvaluator::predict_approval_rate(features, model);
-    std::string reason = RiskEvaluator::evaluate_risk_factors(features, model, risk_prob);
+    
+    // Sinh lý do động (Dynamic Explainability) dựa trên dữ liệu thô và XAI
+    std::string reason;
+    if (risk_prob >= 0.5) {
+        if (income > 0 && debt > income * 0.4) {
+            reason = "Tỷ lệ nợ trên thu nhập (DTI) vượt ngưỡng an toàn (>40%).";
+        } else if (delinquency > 0) {
+            reason = "Có lịch sử trễ hạn thanh toán, rủi ro tín dụng cao.";
+        } else {
+            reason = RiskEvaluator::evaluate_risk_factors(features, model, risk_prob);
+        }
+    } else {
+        reason = "Hồ sơ tín dụng an toàn. Các chỉ số đều ở mức tốt.";
+    }
 
     db.displayAssessmentCard(risk_prob, reason);
 }
@@ -158,14 +171,6 @@ static void startup_training(Dashboard& db, NeuralNetwork& model, DataPipeline& 
     }
 
     DataLoader loader;
-
-    // Xây dựng đường dẫn tuyệt đối dùng macro từ CMake, tránh lỗi CWD
-#ifdef RISKGUARD_PROJECT_ROOT
-    std::string csv_path = std::string(RISKGUARD_PROJECT_ROOT) + "/data/dataset.csv";
-#else
-    std::string csv_path = "data/dataset.csv"; // Fallback cho trường hợp biên dịch thủ công
-#endif
-
     std::cout << ansi::YELLOW << "[HỆ THỐNG] Đang tải dữ liệu từ " << csv_path << "..." << ansi::RESET << std::endl;
     Matrix raw_data = loader.loadRawCSV(csv_path);
 
@@ -174,7 +179,7 @@ static void startup_training(Dashboard& db, NeuralNetwork& model, DataPipeline& 
         return;
     }
 
-    // 1. Phân tích tham số tự động cho DataPipeline
+    // 1. Phân tích tham số tự động cho DataPipeline (Auto-Fit)
     std::cout << ansi::YELLOW << "[HỆ THỐNG] Phân tích phân phối thống kê từ dữ liệu..." << ansi::RESET << std::endl;
     pipeline.fit(raw_data);
 
