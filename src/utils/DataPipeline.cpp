@@ -1,48 +1,48 @@
 #include "riskguard/utils/DataPipeline.hpp"
-#include <cmath>
 
 namespace riskguard {
 
-// Ngưỡng an toàn để chống lỗi chia cho 0 hoặc chia số quá nhỏ (Numerical Instability)
-constexpr double EPSILON = 1e-7;
-
-void DataPipeline::set_age_params(double mean, double std_dev) {
-    age_mean = mean;
-    age_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
-}
+// ── Thiết lập tham số chuẩn hóa ────────────────────────────────────────────
 
 void DataPipeline::set_income_params(double mean, double std_dev) {
-    income_mean = mean;
+    income_mean    = mean;
     income_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
 }
 
-void DataPipeline::set_credit_score_params(double mean, double std_dev) {
-    credit_score_mean = mean;
-    credit_score_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
+void DataPipeline::set_debt_params(double mean, double std_dev) {
+    debt_mean    = mean;
+    debt_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
 }
 
-void DataPipeline::set_job_status_mapping(const std::unordered_map<std::string, double>& mapping) {
-    job_status_map = mapping;
+void DataPipeline::set_delinquency_params(double mean, double std_dev) {
+    delinquency_mean    = mean;
+    delinquency_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
 }
 
-std::vector<double> DataPipeline::transform(const Customer& customer) const {
+void DataPipeline::set_age_params(double mean, double std_dev) {
+    age_mean    = mean;
+    age_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
+}
+
+// ── Phép Z-score + kẹp biên [-3, 3] (hàm tĩnh nội bộ) ─────────────────────
+
+double DataPipeline::zscore_clip(double value, double mean, double std_dev) {
+    double z = (value - mean) / std_dev;
+    return std::clamp(z, CLIP_MIN, CLIP_MAX);
+}
+
+// ── Hàm biến đổi chính ──────────────────────────────────────────────────────
+
+std::vector<double> DataPipeline::transform(double income, double debt,
+                                             double delinquency, double age) const {
     std::vector<double> features;
-    // Tối ưu bộ nhớ: cấp phát trước 4 không gian để tránh việc cấp phát lại
     features.reserve(4);
 
-    // Chuẩn hóa Z-score cho các biến liên tục
-    features.push_back((customer.get_age() - age_mean) / age_std_dev);
-    features.push_back((customer.get_income() - income_mean) / income_std_dev);
-    features.push_back((customer.get_credit_score() - credit_score_mean) / credit_score_std_dev);
-
-    // Mã hóa nhãn (Label encoding) cho biến phân loại
-    auto it = job_status_map.find(customer.get_job_status());
-    if (it != job_status_map.end()) {
-        features.push_back(it->second);
-    } else {
-        // Giá trị dự phòng cho các giá trị phân loại không xác định (Out-of-Vocabulary)
-        features.push_back(-1.0);
-    }
+    // Chuẩn hóa Z-score từng đặc trưng và kẹp biên trong [-3.0, 3.0]
+    features.push_back(zscore_clip(income,      income_mean,      income_std_dev));
+    features.push_back(zscore_clip(debt,        debt_mean,        debt_std_dev));
+    features.push_back(zscore_clip(delinquency, delinquency_mean, delinquency_std_dev));
+    features.push_back(zscore_clip(age,         age_mean,         age_std_dev));
 
     return features;
 }

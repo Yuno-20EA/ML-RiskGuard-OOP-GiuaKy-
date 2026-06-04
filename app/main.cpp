@@ -1,105 +1,91 @@
-#include "riskguard/network/NeuralNetwork.hpp"
-#include "riskguard/utils/DataLoader.hpp"
+// ============================================================
+//  RiskGuard ML Framework — app/main.cpp
+//  Giao diện Cyberpunk CLI tương tác nhập liệu khách hàng
+// ============================================================
 #include "riskguard/utils/Dashboard.hpp"
+#include "riskguard/utils/DataPipeline.hpp"
+#include "riskguard/network/NeuralNetwork.hpp"
+#include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
 #include "riskguard/layers/SigmoidLayer.hpp"
+#include "riskguard/utils/DataLoader.hpp"
 #include <iostream>
 #include <memory>
-#include <thread>
-#include <chrono>
 
 using namespace riskguard;
 
-void simulate_delay(int ms) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+// ── Khởi tạo kiến trúc mạng nơ-ron chuẩn 4→8→1 ────────────────────────────
+static NeuralNetwork build_network() {
+    NeuralNetwork net;
+    net.add_layer(std::make_unique<LinearLayer>(4, 8));
+    net.add_layer(std::make_unique<SigmoidLayer>());
+    net.add_layer(std::make_unique<LinearLayer>(8, 1));
+    net.add_layer(std::make_unique<SigmoidLayer>());
+    return net;
 }
 
+// ── Thiết lập tham số thống kê từ phân phối dataset.csv ─────────────────────
+static DataPipeline build_pipeline() {
+    DataPipeline pipeline;
+    // Các tham số Mean/StdDev được tính từ phân phối thực tế của dataset.csv
+    pipeline.set_income_params(70000.0, 30000.0);
+    pipeline.set_debt_params(15000.0, 10000.0);
+    pipeline.set_delinquency_params(0.5, 0.5);
+    pipeline.set_age_params(45.0, 15.0);
+    return pipeline;
+}
+
+// ── Vòng lặp xử lý một lần đánh giá khách hàng ─────────────────────────────
+static void run_single_assessment(Dashboard& db, DataPipeline& pipeline, NeuralNetwork& model) {
+    std::cout << "\n";
+
+    // Thu thập dữ liệu thô từ bàn phím qua bộ giáp nhập liệu an toàn
+    double income      = db.getSafeDouble("  ▶ Nhập Thu nhập hàng năm (VND): ", 0.0, 1e9);
+    double debt        = db.getSafeDouble("  ▶ Nhập Tổng dư nợ hiện tại (VND): ", 0.0, 1e9);
+    double delinquency = db.getSafeDouble("  ▶ Nhập Số lần trễ hạn (0 - 100): ", 0.0, 100.0);
+    int    age         = db.getSafeInt   ("  ▶ Nhập Tuổi của khách hàng: ", 18, 100);
+
+    // Chuẩn hóa Z-score + kẹp biên [-3.0, 3.0] qua DataPipeline
+    std::vector<double> features = pipeline.transform(income, debt,
+                                                       delinquency,
+                                                       static_cast<double>(age));
+
+    // Dự đoán xác suất vỡ nợ (default) qua RiskEvaluator
+    double risk_prob = RiskEvaluator::predict_approval_rate(features, model);
+
+    // Hiển thị kết quả dưới dạng thẻ thẩm định ASCII Art
+    db.displayAssessmentCard(risk_prob, "Du lieu nguoi dung nhap tu ban phim");
+}
+
+// ── Điểm khởi đầu toàn bộ hệ thống ─────────────────────────────────────────
 int main() {
     try {
+        // Khởi tạo đối tượng Dashboard (Tự kích hoạt ANSI & UTF-8 trên Windows)
         Dashboard db;
-        db.drawHeader();
-        simulate_delay(1000);
+        NeuralNetwork model = build_network();
+        DataPipeline  pipeline = build_pipeline();
 
-        // 1. Khởi tạo DataLoader và tải dữ liệu
-        std::cout << "\n[BƯỚC 1] Nạp & Chuẩn hóa dữ liệu từ data/dataset.csv..." << std::endl;
-        simulate_delay(1000);
-        DataLoader loader;
-        Matrix data = loader.loadAndNormalize("../data/dataset.csv");
+        // Danh sách tùy chọn Menu động
+        const std::vector<std::string> menu_options = {
+            "Nhan ho so & Tham dinh rui ro tin dung",
+            "Thoat he thong"
+        };
 
-        int num_samples = data.get_rows();
-        if (num_samples == 0) {
-            std::cerr << "[LỖI] Khong the doc du lieu hoac file rong." << std::endl;
-            return 1;
+        while (true) {
+            db.showMenu(menu_options);
+
+            int choice = db.getSafeInt("", 1, static_cast<int>(menu_options.size()));
+
+            if (choice == 1) {
+                run_single_assessment(db, pipeline, model);
+            } else {
+                std::cout << "\n\033[1;36m[SYSTEM] Hệ thống đã đóng an toàn. Tạm biệt!\033[0m\n\n";
+                break;
+            }
         }
-        std::cout << "  -> Đã tải thành công " << num_samples << " bản ghi." << std::endl;
-        simulate_delay(1500);
 
-        // 2. Chia dữ liệu thành X (4 features) và Y (1 label)
-        std::cout << "\n[BƯỚC 2] Tiền xử lý & Phân chia Features/Labels..." << std::endl;
-        simulate_delay(1000);
-        Matrix X(num_samples, 4);
-        Matrix Y(num_samples, 1);
-        for (int i = 0; i < num_samples; ++i) {
-            X(i, 0) = data(i, 0); // Income
-            X(i, 1) = data(i, 1); // Debt
-            X(i, 2) = data(i, 2); // Delinquency
-            X(i, 3) = data(i, 3); // Age
-            Y(i, 0) = data(i, 4); // Default
-        }
-        std::cout << "  -> Đã tách 4 features (Income, Debt, Delinq, Age) và 1 label (Default)." << std::endl;
-        simulate_delay(1500);
-
-        // 3. Khởi tạo mạng Nơ-ron cấu hình tuyến tính
-        std::cout << "\n[BƯỚC 3] Khởi tạo kiến trúc Neural Network (4 -> 8 -> 1)..." << std::endl;
-        simulate_delay(1000);
-        NeuralNetwork net;
-        net.add_layer(std::make_unique<LinearLayer>(4, 8));
-        net.add_layer(std::make_unique<SigmoidLayer>());
-        net.add_layer(std::make_unique<LinearLayer>(8, 1));
-        net.add_layer(std::make_unique<SigmoidLayer>());
-        std::cout << "  -> Khởi tạo trọng số hoàn tất." << std::endl;
-        simulate_delay(1500);
-
-        // 4. Huấn luyện mô hình (Training loop)
-        int epochs = 10;
-        double learning_rate = 0.01;
-        std::cout << "\n[BƯỚC 4] Bắt đầu quá trình huấn luyện AI (Gradient Descent)..." << std::endl;
-        std::cout << "  -> Epochs: " << epochs << " | Learning Rate: " << learning_rate << "\n" << std::endl;
-        simulate_delay(1000);
-
-        for (int epoch = 1; epoch <= epochs; ++epoch) {
-            Matrix pred = net.forward(X);
-            double loss = net.calculateBCELoss(pred, Y);
-            Matrix grad = net.calculateBCEGradient(pred, Y);
-            net.backward(grad);
-            net.update_parameters(learning_rate);
-            
-            db.showTrainingProgress(epoch, epochs, loss);
-            simulate_delay(800); // Tạm dừng nhìn rõ từng epoch
-        }
-        
-        simulate_delay(1500);
-
-        // 5. Thẩm định mô phỏng một khách hàng
-        std::cout << "\n\n[BƯỚC 5] Thử nghiệm thực tế: Đánh giá hồ sơ khách hàng mới..." << std::endl;
-        simulate_delay(1000);
-        
-        // Khách hàng giả định có thu nhập thấp, nợ cao, từng trễ hạn nợ
-        Matrix test_customer(1, 4);
-        test_customer(0, 0) = 0.2; // Thu nhập thấp
-        test_customer(0, 1) = 0.8; // Nợ cao
-        test_customer(0, 2) = 1.0; // Đã từng trễ hạn
-        test_customer(0, 3) = 0.3; // Tuổi trẻ
-
-        Matrix result = net.forward(test_customer);
-        double risk_prob = result(0, 0);
-        
-        db.displayAssessmentCard(risk_prob, "Thu nhập thấp, dư nợ cao, lịch sử trả nợ xấu");
-
-        std::cout << "\n[HOÀN TẤT] Pipeline đã chạy xong!" << std::endl;
-        
     } catch (const std::exception& e) {
-        std::cerr << "[FATAL EXCEPTION] " << e.what() << std::endl;
+        std::cerr << "\033[1;31m[FATAL EXCEPTION] " << e.what() << "\033[0m\n";
         return 1;
     }
 
