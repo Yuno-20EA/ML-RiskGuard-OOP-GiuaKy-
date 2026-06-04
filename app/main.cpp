@@ -16,7 +16,8 @@ void simulate_delay(int ms) {
 
 int main() {
     try {
-        Dashboard::drawHeader();
+        Dashboard db;
+        db.drawHeader();
         simulate_delay(1000);
 
         // 1. Khởi tạo DataLoader và tải dữ liệu
@@ -73,7 +74,7 @@ int main() {
             net.backward(grad);
             net.update_parameters(learning_rate);
             
-            Dashboard::showTrainingProgress(epoch, epochs, loss);
+            db.showTrainingProgress(epoch, epochs, loss);
             simulate_delay(800); // Tạm dừng nhìn rõ từng epoch
         }
         
@@ -93,7 +94,7 @@ int main() {
         Matrix result = net.forward(test_customer);
         double risk_prob = result(0, 0);
         
-        Dashboard::displayAssessmentCard(risk_prob, "Thu nhập thấp, dư nợ cao, lịch sử trả nợ xấu");
+        db.displayAssessmentCard(risk_prob, "Thu nhập thấp, dư nợ cao, lịch sử trả nợ xấu");
 
         std::cout << "\n[HOÀN TẤT] Pipeline đã chạy xong!" << std::endl;
         

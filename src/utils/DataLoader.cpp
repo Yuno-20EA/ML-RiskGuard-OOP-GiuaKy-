@@ -59,7 +59,7 @@ Matrix DataLoader::loadAndNormalize(const std::string& filename) {
         
         // Kiểm tra an toàn: Duyệt qua các hàng và kiểm tra size để tránh out-of-bounds
         for (int i = 0; i < rows; ++i) {
-            if (j < rawData[i].size()) {
+            if (static_cast<size_t>(j) < rawData[i].size()) {
                 minVal = std::min(minVal, rawData[i][j]);
                 maxVal = std::max(maxVal, rawData[i][j]);
             }
@@ -67,7 +67,7 @@ Matrix DataLoader::loadAndNormalize(const std::string& filename) {
 
         // Thực hiện chuẩn hóa Min-Max: (x - min) / (max - min)
         for (int i = 0; i < rows; ++i) {
-            if (j < rawData[i].size()) {
+            if (static_cast<size_t>(j) < rawData[i].size()) {
                 // Kiểm tra (maxVal == minVal) để tránh lỗi chia 0
                 double normalizedVal = (maxVal == minVal) ? 0.0 : (rawData[i][j] - minVal) / (maxVal - minVal);
                 result(i, j) = normalizedVal; 
