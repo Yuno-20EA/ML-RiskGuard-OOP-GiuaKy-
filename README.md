@@ -12,7 +12,10 @@ Dự án sở hữu nhiều điểm kỹ thuật ấn tượng, thể hiện tư
 2. **Thuật toán GEMM (General Matrix Multiply) Mini:** Phép nhân ma trận được viết tay, hỗ trợ tính toán *in-place* với cờ `transposeA` và `transposeB`, giảm thiểu việc khởi tạo vùng nhớ tạm thời trong quá trình backpropagation.
 3. **Zero-copy Array Access:** Lấy dữ liệu từng hàng ma trận hoàn toàn không tốn chi phí copy nhờ `std::span`.
 4. **Gradient Clipping & Numerical Stability:** Áp dụng `epsilon = 1e-15` để chống lỗi `NaN` khi tính đạo hàm Binary Cross Entropy, kết hợp chặn trần đạo hàm để tránh bùng nổ gradient.
-5. **Numerical Stability:** Áp dụng `epsilon = 1e-15` để chống `NaN` khi tính đạo hàm BCE, gradient clipping ngăn bùng nổ gradient. `std::execution::par_unseq` đã được loại bỏ để đảm bảo tương thích trên MinGW/Windows.
+5. **DataPipeline Động (Dynamic Fitting):** Hàm `fit()` tự động tính Mean và Standard Deviation từ dữ liệu thực, triệt tiêu hoàn toàn các tham số hardcode. Chuẩn hóa Z-Score kết hợp kẹp biên `[-3.0, 3.0]` bảo vệ mạng khỏi dị biệt (Outlier).
+6. **Explainable AI (XAI):** Hệ thống sinh lý do từ chối/phê duyệt dựa trực tiếp trên **Contribution Score** — tích vô hướng giữa đặc trưng đã chuẩn hóa và trọng số thực của mạng nơ-ron, thay vì dùng `if-else` cứng nhắc.
+7. **Runtime Training:** Mô hình huấn luyện 50 Epoch trực tiếp từ `dataset.csv` mỗi lần khởi động, với thanh tiến trình Cyberpunk Terminal hiển thị tổn thất theo thời gian thực.
+8. **Ổn định đường dẫn tuyệt đối (Absolute Path Resolution):** Macro `RISKGUARD_PROJECT_ROOT` được CMake nhúng vào thời điểm biên dịch, đảm bảo chương trình luôn tìm đúng `dataset.csv` dù chạy từ bất kỳ thư mục làm việc nào.
 
 ---
 
@@ -21,8 +24,9 @@ Dự án sở hữu nhiều điểm kỹ thuật ấn tượng, thể hiện tư
 Việc nâng cấp từ C++17 lên **C++20** mang lại các lợi thế mang tính quyết định cho hiệu năng xử lý toán học:
 
 * **`std::span` (Zero-copy View):** Trong C++17, để truyền một hàng của ma trận, ta thường phải copy ra `std::vector` mới, hoặc truyền con trỏ và kích thước thô (dễ gây lỗi bộ nhớ). C++20 `std::span` tạo ra một "khung nhìn" an toàn, chi phí bộ nhớ bằng `0`, giúp truy xuất dữ liệu tuyến tính với hiệu suất tối đa.
-* **`std::execution::par_unseq`:** C++20 chuẩn hóa mạnh mẽ thư viện thực thi song song. Trong các hàm như `update_parameters` hay `elementwiseMultiply`, vòng lặp được tự động *vector hóa* và chạy song song trên nhiều lõi CPU, nhanh hơn hẳn vòng lặp tuần tự của C++17.
+* **`std::string_view`:** Được dùng trong `Dashboard::getSafeDouble()` và `getSafeInt()` để truyền chuỗi prompt mà không cần sao chép, giảm overhead ở mỗi lần nhập liệu của người dùng.
 * **`[[nodiscard]]` tinh chỉnh:** Giúp compiler cảnh báo lập trình viên nếu quên gán kết quả của `forward()` hoặc `backward()`, một lỗi rất dễ mắc phải khi viết pipeline Deep Learning.
+* **Structured Bindings (C++17 → 20):** Được dùng trong `tests/main.cpp` để duyệt tập mẫu kiểm thử một cách tường minh: `for (const auto& [inc, dbt, del, age] : samples)`.
 
 ---
 
@@ -30,7 +34,7 @@ Việc nâng cấp từ C++17 lên **C++20** mang lại các lợi thế mang t�
 
 Dự án ứng dụng triệt để 4 tính chất của OOP để tạo ra một Framework dễ mở rộng:
 
-1. **Tính Trừu Tượng (Abstraction):** 
+1. **Tính Trừu Tượng (Abstraction):**
    Lớp `Layer` là một Abstract Base Class (ABC) với các phương thức thuần ảo (`forward`, `backward`, `update_parameters`). Neural Network chỉ cần giao tiếp với `Layer` mà không cần biết bên dưới là Linear hay Sigmoid. Hệ thống `TestRunner` cũng ẩn đi logic thực thi nội bộ.
 2. **Tính Đóng Gói (Encapsulation):**
    Lớp `Matrix` giấu kín mảng `data` một chiều (private) và thuật toán `r * cols + c`. Người dùng bên ngoài chỉ thao tác qua toán tử `operator()(r, c)`. Trạng thái bộ nhớ được bảo vệ an toàn.
@@ -75,6 +79,7 @@ classDiagram
         +backward(output_gradient: Matrix) void
         +update_parameters(lr: double) void
         +calculateBCELoss() double
+        +get_first_layer_parameters() vector~Matrix*~
     }
 
     class Matrix {
@@ -86,41 +91,92 @@ classDiagram
         +gemm() void$
     }
 
+    class RiskEvaluator {
+        +predict_approval_rate(features, model) double$
+        +evaluate_risk_factors(features, model, prob) string$
+    }
+
+    class DataPipeline {
+        -income_mean, income_std_dev: double
+        -debt_mean, debt_std_dev: double
+        -delinquency_mean, delinquency_std_dev: double
+        -age_mean, age_std_dev: double
+        +fit(raw_data: Matrix) void
+        +transform(income, debt, delinq, age) vector~double~
+        +transform(raw_data: Matrix) Matrix
+    }
+
     Layer <|-- LinearLayer
     Layer <|-- SigmoidLayer
     NeuralNetwork "1" *-- "*" Layer : Contains
     LinearLayer "4" o-- Matrix : Uses
     SigmoidLayer "1" o-- Matrix : Uses
+    RiskEvaluator ..> NeuralNetwork : Uses
+    DataPipeline ..> Matrix : Produces
 ```
 
 ---
 
-## 🔄 Luồng Dữ Liệu (Data Flow Activity)
+## 🔄 Luồng Dữ Liệu Hoàn Chỉnh (End-to-End Data Flow)
 
-Sơ đồ dưới đây mô tả cách hệ thống RiskGuard tiếp nhận dữ liệu và huấn luyện AI (Backpropagation Workflow):
+Sơ đồ dưới đây mô tả toàn bộ luồng từ lúc khởi động đến khi đưa ra kết luận XAI:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Đọc_Dữ_Liệu_CSV : DataLoader
-    
-    state Đọc_Dữ_Liệu_CSV {
-        Đọc_Raw_Data --> MinMax_Scaling : Trích xuất Đặc trưng & Nhãn
-    }
-    
-    Đọc_Dữ_Liệu_CSV --> Vòng_Lặp_Epoch (Training)
+    [*] --> NạpCSV : DataLoader::loadRawCSV()
 
-    state Vòng_Lặp_Epoch (Training) {
+    state NạpCSV {
+        ĐọcFile --> XâyDựngMaTrậnThô : Bỏ qua header, parse double
+    }
+
+    NạpCSV --> FitPipeline : DataPipeline::fit()
+
+    state FitPipeline {
+        TínhMean --> TínhStdDev : Quét toàn bộ 28,638 bản ghi
+    }
+
+    FitPipeline --> ChuẩnHóa : DataPipeline::transform(Matrix)
+
+    state Vòng_Lặp_Huấn_Luyện {
         direction LR
-        Lan_Truyền_Tiến(Forward) --> Tính_Lỗi(BCELoss)
-        Tính_Lỗi(BCELoss) --> Lan_Truyền_Ngược(Backward)
-        Lan_Truyền_Ngược(Backward) --> Cập_Nhật_Trọng_Số(Update_Weights)
+        ForwardPass --> TínhBCELoss
+        TínhBCELoss --> BackwardPass
+        BackwardPass --> CậpNhậtTrọngSố
     }
 
-    Cập_Nhật_Trọng_Số(Update_Weights) --> Vòng_Lặp_Epoch (Training) : Epoch tiếp theo
-    Vòng_Lặp_Epoch (Training) --> Giao_Diện_Thẩm_Định : Hoàn tất 100%
-    
-    Giao_Diện_Thẩm_Định --> [*]
+    ChuẩnHóa --> Vòng_Lặp_Huấn_Luyện : 50 Epochs
+    Vòng_Lặp_Huấn_Luyện --> MenuChính : Mô hình sẵn sàng
+
+    state NhậpHồSơKháchHàng {
+        NhậpThuNhập --> NhậpDưNợ
+        NhậpDưNợ --> NhậpTrễHạn
+        NhậpTrễHạn --> NhậpTuổi
+    }
+
+    MenuChính --> NhậpHồSơKháchHàng
+    NhậpHồSơKháchHàng --> ZScoreClipping : pipeline.transform(vector)
+    ZScoreClipping --> HiệuỨngPhânTích : Staged AI Animation (3 giai đoạn)
+    HiệuỨngPhânTích --> DựĐoán : RiskEvaluator::predict_approval_rate()
+    DựĐoán --> XAI : evaluate_risk_factors() — tính Contribution Score
+    XAI --> HiểnThịKếtQuả : displayAssessmentCard()
+    HiểnThịKếtQuả --> MenuChính
 ```
+
+---
+
+## 🧠 Explainable AI (XAI) — Giải Thích Quyết Định Của Mạng
+
+Đây là tính năng **cốt lõi nhất** được bổ sung trong phiên bản v2.0. Thay vì đưa ra lý do cứng nhắc (hardcode), hệ thống thực sự "đọc tâm trí" mạng nơ-ron:
+
+**Thuật toán Contribution Score:**
+```
+score_i = feature_normalized[i] × Σ(weights[i][j], j=0..hidden_size)
+```
+
+Thuộc tính nào có `score_i` dương lớn nhất → đó là **nguyên nhân cốt lõi** của rủi ro cao. Kết quả sinh ra các lý do như:
+- *"Dư nợ hiện tại quá cao, tạo áp lực trả nợ lớn."*
+- *"Lịch sử tín dụng xấu, có nhiều lần trễ hạn thanh toán."*
+- *"Thu nhập không ổn định hoặc thấp hơn chuẩn an toàn."*
 
 ---
 
@@ -130,7 +186,7 @@ stateDiagram-v2
 
 **Cách dữ liệu được định hình thành JSON:**
 * **Kiến trúc phân cấp:** Mạng nơ-ron chứa một danh sách (Array) các Lớp (Layers). Mỗi lớp mang một cái tên (VD: `"Linear"`, `"Sigmoid"`).
-* **Chuyển đổi Ma Trận thành Mảng JSON:** Lớp Linear chứa trọng số (`weights`) và độ lệch (`biases`). Vì kiến trúc `Matrix` của dự án sử dụng mảng phẳng (`vector<double>`), thay vì lưu thành mảng 2 chiều (Mảng lồng mảng), hệ thống chỉ cần lưu số hàng (`rows`), số cột (`cols`), và danh sách phẳng toàn bộ các số thực.
+* **Chuyển đổi Ma Trận thành Mảng JSON:** Lớp Linear chứa trọng số (`weights`) và độ lệch (`biases`). Vì kiến trúc `Matrix` của dự án sử dụng mảng phẳng (`vector<double>`), hệ thống chỉ cần lưu số hàng (`rows`), số cột (`cols`), và danh sách phẳng toàn bộ các số thực.
 
 *Ví dụ minh họa cấu trúc JSON lưu trữ:*
 ```json
@@ -140,8 +196,8 @@ stateDiagram-v2
     {
       "type": "Linear",
       "parameters": {
-        "weights": { "rows": 4, "cols": 8, "data": [0.12, -0.45, 0.89, ...] },
-        "biases": { "rows": 1, "cols": 8, "data": [0.01, -0.02, ...] }
+        "weights": { "rows": 4, "cols": 8, "data": [0.12, -0.45, 0.89, "..."] },
+        "biases": { "rows": 1, "cols": 8, "data": [0.01, -0.02, "..."] }
       }
     },
     {
@@ -151,6 +207,7 @@ stateDiagram-v2
   ]
 }
 ```
+
 **Quy trình Nạp (Deserialization):**
 Chương trình sẽ đọc chuỗi ký tự, tìm kiếm các khóa `"rows"` và `"cols"` để tái cấp phát mảng bộ nhớ `Matrix`, sau đó nạp tuần tự danh sách các số thực vào vùng nhớ phẳng (Flat Memory) để tiếp tục tính toán tức thì.
 
@@ -160,91 +217,102 @@ Chương trình sẽ đọc chuỗi ký tự, tìm kiếm các khóa `"rows"` v�
 
 ```text
 ML_Guard_OOP_GiuaKy/
-├── CMakeLists.txt                      # Cấu hình C++20, build targets, linker flags
+├── CMakeLists.txt                      # Cấu hình C++20, build targets, macro RISKGUARD_PROJECT_ROOT
 ├── README.md                           # Tài liệu thiết kế hệ thống
-├── .gitignore                          # Production-grade: loại trừ build/, binaries, data raw
+├── .gitignore                          # Loại trừ build/, binaries, data raw
 │
 ├── include/                            # Public API headers (.hpp only)
 │   └── riskguard/
 │       ├── core/
-│       │   ├── Customer.hpp            # DTO đối tượng khách hàng thuần túy
+│       │   ├── Customer.hpp            # DTO đối tượng khách hàng
 │       │   ├── Layer.hpp               # Abstract Base Class (ABC) — Tính Trừu Tượng
 │       │   └── Matrix.hpp              # Flat memory matrix, GEMM, std::span
 │       ├── layers/
 │       │   ├── LinearLayer.hpp         # Fully connected layer (weights + biases)
 │       │   └── SigmoidLayer.hpp        # Sigmoid activation với numerical clamping
 │       ├── network/
-│       │   ├── NeuralNetwork.hpp       # Forward / Backward / BCE Loss
-│       │   └── RiskEvaluator.hpp       # Inference module thẩm định rủi ro thời gian thực
+│       │   ├── NeuralNetwork.hpp       # Forward / Backward / BCE Loss + XAI accessor
+│       │   └── RiskEvaluator.hpp       # Inference + XAI: evaluate_risk_factors()
 │       └── utils/
-│           ├── Dashboard.hpp           # Giao diện Cyberpunk UI & Safe Input (C++20)
-│           ├── DataLoader.hpp          # CSV reader, Min-Max normalization
-│           └── DataPipeline.hpp        # Bộ tiền xử lý đầu vào (Z-Score, Label Encode)
+│           ├── Dashboard.hpp           # Cyberpunk CLI UI & Safe Input (C++20)
+│           ├── DataLoader.hpp          # CSV reader thuần thô (loadRawCSV, không scale)
+│           └── DataPipeline.hpp        # Z-Score fit/transform + Outlier Clipping [-3,3]
 │
 ├── src/                                # Implementation files (mirror include/)
 │   ├── core/
 │   │   └── Matrix.cpp                  # GEMM fix (transA/transB), zero-copy span
 │   ├── layers/
-│   │   ├── LinearLayer.cpp             # He initialization, gradient accumulation
+│   │   ├── LinearLayer.cpp             # Gradient accumulation, gradient clipping
 │   │   └── SigmoidLayer.cpp            # Sigmoid forward/backward
 │   ├── network/
-│   │   ├── NeuralNetwork.cpp           # Pipeline orchestration, BCE gradient
-│   │   └── RiskEvaluator.cpp           # Xử lý ma trận đầu vào/đầu ra, an toàn hằng số
+│   │   ├── NeuralNetwork.cpp           # Pipeline orchestration, get_first_layer_parameters()
+│   │   └── RiskEvaluator.cpp           # XAI Contribution Score, dynamic reason generation
 │   └── utils/
-│       ├── Dashboard.cpp               # Cấu hình ANSI Windows, Dynamic Menu Unicode
-│       ├── DataLoader.cpp              # File parsing, normalization
-│       └── DataPipeline.cpp            # Xử lý ngoại lệ, chống lỗi tràn số lượng (Epsilon)
+│       ├── Dashboard.cpp               # Cấu hình ANSI Windows API, Việt hoá hoàn toàn
+│       ├── DataLoader.cpp              # loadRawCSV() — chỉ đọc thô, không normalize
+│       └── DataPipeline.cpp            # fit() tính thống kê + transform(Matrix) batch
 │
 ├── app/
-│   └── main.cpp                        # Entry point: step-by-step pipeline + Dashboard UI
+│   └── main.cpp                        # Entry point: Runtime Training → Cyberpunk CLI → XAI
 │
 ├── tests/                              # Unit Testing Framework (tự viết, không dùng thư viện ngoài)
-│   ├── main.cpp                        # Test runner entry point (đăng ký & chạy test cases)
+│   ├── main.cpp                        # Đăng ký & chạy 11 test cases
 │   ├── logger.hpp                      # Performance profiler (High Resolution Clock)
 │   ├── test_runner.hpp                 # TestCase ABC + TestRunner Singleton + Assert macros
 │   ├── test_matrix.cpp                 # 3 test cases: multiply, broadcasting, transpose
 │   ├── test_layers.cpp                 # 3 test cases: sigmoid, linear forward, BCE gradient
-│   └── test_csv_reader.cpp             # 2 test cases: file not found, min-max scaler
+│   └── test_csv_reader.cpp             # 2 test cases: file not found, raw CSV loader
 │
 ├── data/
-│   ├── dataset.csv                     # Processed data (28,638 records, 5 features)
+│   ├── dataset.csv                     # Processed data (28,638 records, 5 features: Income/Debt/Delinquency/Age/Default)
 │   └── raw/
 │       └── credit_risk_dataset_raw.csv # Raw data gốc — Nguồn: Kaggle.com
 │
 └── scripts/
-    └── process_data.py                 # Tiền xử lý CSV: làm sạch, encode, normalize
+    └── process_data.py                 # Tiền xử lý CSV: làm sạch, encode
 ```
 
+---
+
 ## 🛠️ Hướng Dẫn Cài Đặt (Installation)
-Yêu cầu môi trường có hỗ trợ C++20 (GCC 11+ / MSVC 2019+).
+
+Yêu cầu môi trường có hỗ trợ C++20 (GCC 11+ / MSVC 2019+) và CMake 3.20+.
 
 ```bash
 # 1. Clone repository về máy cục bộ
 git clone https://github.com/Yuno-20EA/ML_Guard_OOP_GiuaKy.git
 cd ML_Guard_OOP_GiuaKy
 
-# 2. Khởi tạo build
+# 2. Khởi tạo thư mục build
 mkdir build && cd build
 
-# 3. Cấu hình CMake
+# 3. Cấu hình CMake (tự động nhúng RISKGUARD_PROJECT_ROOT)
 cmake ..
 
-# 4. Biên dịch hệ thống kiểm thử
-cmake --build . --target riskguard_tests
+# 4. Biên dịch ứng dụng chính
+cmake --build . --target riskguard
 
-# 5. Chạy kiểm thử
+# 5. Biên dịch và chạy bộ kiểm thử
+cmake --build . --target riskguard_tests
 ./riskguard_tests
+
+# 6. Chạy ứng dụng
+./riskguard
 ```
+
+> **Lưu ý:** Đường dẫn `dataset.csv` được giải quyết tự động qua macro `RISKGUARD_PROJECT_ROOT` nhúng bởi CMake — không cần cấu hình thêm.
 
 ---
 
 ## 💻 Hướng Dẫn Sử Dụng (Usage)
 
-Dưới đây là ví dụ minh họa cách khởi tạo pipeline đọc dữ liệu từ file CSV, đưa vào mạng nơ-ron huấn luyện:
+Dưới đây là ví dụ minh họa cách sử dụng API của RiskGuard Framework:
 
 ```cpp
 #include "riskguard/network/NeuralNetwork.hpp"
+#include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/utils/DataLoader.hpp"
+#include "riskguard/utils/DataPipeline.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
 #include "riskguard/layers/SigmoidLayer.hpp"
 #include <memory>
@@ -252,24 +320,36 @@ Dưới đây là ví dụ minh họa cách khởi tạo pipeline đọc dữ li
 using namespace riskguard;
 
 int main() {
-    // 1. Tải & chuẩn hóa dữ liệu từ CSV
+    // 1. Tải dữ liệu thô (không normalize)
     DataLoader loader;
-    Matrix data = loader.loadAndNormalize("../data/dataset.csv");
+    Matrix raw = loader.loadRawCSV("data/dataset.csv");
 
-    // 2. Khởi tạo mạng Nơ-ron (kiến trúc 4 → 8 → 1)
+    // 2. Tự động học phân phối từ dữ liệu thực
+    DataPipeline pipeline;
+    pipeline.fit(raw);                      // Tính Mean & StdDev từng thuộc tính
+    Matrix normalized = pipeline.transform(raw);  // Z-Score + Clipping [-3,3]
+
+    // 3. Khởi tạo mạng nơ-ron (kiến trúc 4 → 8 → 1)
     NeuralNetwork net;
     net.add_layer(std::make_unique<LinearLayer>(4, 8));
     net.add_layer(std::make_unique<SigmoidLayer>());
     net.add_layer(std::make_unique<LinearLayer>(8, 1));
     net.add_layer(std::make_unique<SigmoidLayer>());
 
-    // 3. Training loop (10 epochs, lr = 0.01)
-    for (int epoch = 1; epoch <= 10; ++epoch) {
-        Matrix pred = net.forward(data);
-        Matrix grad = net.calculateBCEGradient(pred, labels);
+    // 4. Training loop (50 epochs, lr = 0.05)
+    Matrix X(/*...*/), Y(/*...*/);
+    for (int epoch = 1; epoch <= 50; ++epoch) {
+        Matrix pred = net.forward(X);
+        Matrix grad = net.calculateBCEGradient(pred, Y);
         net.backward(grad);
-        net.update_parameters(0.01);
+        net.update_parameters(0.05);
     }
+
+    // 5. Inference + XAI
+    std::vector<double> features = pipeline.transform(50000.0, 5000.0, 0.0, 30);
+    double risk = RiskEvaluator::predict_approval_rate(features, net);
+    std::string reason = RiskEvaluator::evaluate_risk_factors(features, net, risk);
+
     return 0;
 }
 ```
@@ -282,8 +362,8 @@ int main() {
 * **Tuyệt đối không push trực tiếp lên nhánh `main` hoặc `master`.** Nhánh này phản ánh trạng thái production ổn định, chỉ chứa mã nguồn đã kiểm thử.
 * Nhánh **`develop`** là nhánh trung tâm tích hợp. Mọi tính năng mới phải được gộp vào đây trước khi phát hành.
 * Áp dụng **Feature Branching**. Tên nhánh tuân theo tiền tố:
-  * `feature/ten-tinh-nang` (Ví dụ: `feature/csv-reader`)
-  * `bugfix/ten-loi` (Ví dụ: `bugfix/fix-matrix-overflow`)
+  * `feature/ten-tinh-nang` (Ví dụ: `feature/xai-reasoning`)
+  * `bugfix/ten-loi` (Ví dụ: `bugfix/fix-csv-path`)
 
 ### 2. Quy chuẩn Commit (Commit Messages)
 Thông điệp commit phải ngắn gọn, rõ nghĩa (áp dụng **Conventional Commits**):
@@ -293,7 +373,8 @@ Thông điệp commit phải ngắn gọn, rõ nghĩa (áp dụng **Conventional
 * `feat`: Thêm tính năng mới
 * `fix`: Sửa lỗi
 * `docs`: Cập nhật tài liệu (README)
-* `style`: Định dạng mã nguồn
+* `style`: Định dạng mã nguồn, Việt hoá giao diện
+* `refactor`: Tái cấu trúc mà không thay đổi chức năng
 
 ---
 
@@ -315,12 +396,32 @@ Nếu có conflict, người tạo PR phải tự `git pull` nhánh `develop` v�
 
 Dự án được phát triển và phối hợp vận hành bởi các thành viên:
 
-* **Nguyễn Hoàng Hải** – *Nhóm trưởng* - *MSV: 25112038*
-  * Thiết lập kiến trúc hệ thống, cấu trúc thư mục chuẩn. Viết lõi tính toán C++20 (`Matrix`, `Layer`, `LinearLayer`, `SigmoidLayer`, `NeuralNetwork`).
-* **Trần Đức Anh Minh** – *Thành viên* - *MSV: 25112085*
+* **Nguyễn Hoàng Hải** – *Nhóm trưởng* — *MSV: 25112038*
+
+  Thiết lập kiến trúc hệ thống và cấu trúc thư mục chuẩn. Xây dựng toàn bộ lõi tính toán C++20 (`Matrix`, `Layer`, `LinearLayer`, `SigmoidLayer`, `NeuralNetwork`).
+
+  **Đóng góp kỹ thuật trong phiên nâng cấp v2.0:**
+  - Tái kiến trúc `DataPipeline` với hàm `fit()` tự động học Mean/StdDev từ dữ liệu thực, loại bỏ hoàn toàn các tham số hardcode.
+  - Thêm hàm `transform(Matrix)` để chuẩn hóa toàn bộ tập huấn luyện theo cùng một bộ Z-Score, đồng bộ với pipeline dự đoán.
+  - Cải tiến `DataLoader` đổi sang `loadRawCSV()`, loại bỏ Min-Max Scaling lệch pha, giải quyết Distribution Mismatch nghiêm trọng.
+  - Tích hợp **Runtime Training**: mô hình huấn luyện tự động 50 Epochs từ `dataset.csv` ngay khi khởi động, kèm thanh tiến trình hoạt hoạ.
+  - Triển khai **Explainable AI (XAI)** trong `RiskEvaluator::evaluate_risk_factors()`: tính Contribution Score từ trọng số lớp 1 của mạng để xác định thuộc tính gây rủi ro cao nhất.
+  - Bổ sung `NeuralNetwork::get_first_layer_parameters()` để XAI có thể đọc trực tiếp tham số mạng.
+  - Việt hoá 100% giao diện CLI: tất cả các chuỗi output, thông báo lỗi, nhãn kết quả.
+  - Cập nhật giới hạn nhập liệu: Thu nhập tối đa 100 Tỷ VND, Dư nợ 20 Tỷ VND, Tuổi tối đa 200.
+  - Sửa lỗi **Absolute Path** cho `dataset.csv` bằng macro CMake `RISKGUARD_PROJECT_ROOT`, đảm bảo chương trình chạy đúng dù được gọi từ bất kỳ thư mục nào.
+  - Nâng cấp bộ Unit Test lên 11 test cases, bao gồm `XAIEvaluationTest` kiểm tra tính đúng đắn của thuật toán giải thích.
+
+* **Trần Đức Anh Minh** – *Thành viên* — *MSV: 25112085*
   * Thiết kế hệ thống lưu trữ/tải mô hình (`ModelManager`), cấu trúc hàm mất mát (`LossFunction`).
-* **Bùi Trần Thu Trang** – *Thành viên* - *MSV: 25112114*
+
+* **Bùi Trần Thu Trang** – *Thành viên* — *MSV: 25112114*
   * Phát triển công cụ tải và xử lý dữ liệu (`DataLoader`), thiết kế giao diện theo dõi huấn luyện (`Dashboard`).
-* **Trần Ngọc Hiếu** – *Thành viên* - *MSV: 25112045*
+
+* **Trần Ngọc Hiếu** – *Thành viên* — *MSV: 25112045*
   * Xây dựng framework kiểm thử tự động, viết các kịch bản test case đảm bảo độ chính xác thuật toán.
-## Nguồn dữ liệu đến từ trang web : Kaggle.com - Dữ liệu được làm sạch bởi Hải    
+
+---
+
+## Nguồn dữ liệu
+Dữ liệu đến từ **[Kaggle.com](https://www.kaggle.com)**. Toàn bộ quá trình làm sạch, mã hoá và xử lý được thực hiện bởi **Nguyễn Hoàng Hải** qua script `scripts/process_data.py`.
