@@ -143,8 +143,16 @@ static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, N
 // ── Khởi tạo & Huấn luyện mạng tự động ──────────────────────────────────────
 static void startup_training(Dashboard& db, NeuralNetwork& model, DataPipeline& pipeline) {
     DataLoader loader;
-    std::cout << ansi::YELLOW << "[HỆ THỐNG] Đang tải dữ liệu từ data/dataset.csv..." << ansi::RESET << std::endl;
-    Matrix raw_data = loader.loadRawCSV("data/dataset.csv");
+
+    // Xây dựng đường dẫn tuyệt đối dùng macro từ CMake, tránh lỗi CWD
+#ifdef RISKGUARD_PROJECT_ROOT
+    std::string csv_path = std::string(RISKGUARD_PROJECT_ROOT) + "/data/dataset.csv";
+#else
+    std::string csv_path = "data/dataset.csv"; // Fallback cho trường hợp biên dịch thủ công
+#endif
+
+    std::cout << ansi::YELLOW << "[HỆ THỐNG] Đang tải dữ liệu từ " << csv_path << "..." << ansi::RESET << std::endl;
+    Matrix raw_data = loader.loadRawCSV(csv_path);
 
     if (raw_data.get_rows() == 0) {
         std::cerr << ansi::BOLD << "\033[1;31m[LỖI] Không thể nạp dataset. CSV trống hoặc sai đường dẫn.\033[0m\n";

@@ -85,6 +85,9 @@ endif()
 # app/main.cpp does not exist yet, we will just use src/main.cpp which is a test runner right now
 add_executable(riskguard app/main.cpp)
 target_link_libraries(riskguard PRIVATE riskguard_lib)
+target_compile_definitions(riskguard PRIVATE
+    RISKGUARD_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 # ════════════════════════════════════════════════
 #  Test Runner — Tự viết, không dùng thư viện ngoài
