@@ -16,9 +16,12 @@ public:
     void backward(const Matrix& output_gradient);
     void update_parameters(double learning_rate);
 
-    // 3. Hàm tính lỗi và đạo hàm lỗi (Binary Cross-Entropy)
+    // Hàm tính lỗi và đạo hàm lỗi (Binary Cross-Entropy)
     double calculateBCELoss(const Matrix& predictions, const Matrix& targets);
     Matrix calculateBCEGradient(const Matrix& predictions, const Matrix& targets);
+
+    // Trích xuất trọng số của lớp mạng đầu tiên để phục vụ XAI
+    std::vector<Matrix*> get_first_layer_parameters() const;
 
 private:
     std::vector<std::unique_ptr<Layer>> layers;

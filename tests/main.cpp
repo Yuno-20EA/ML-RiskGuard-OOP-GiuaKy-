@@ -156,6 +156,35 @@ public:
     }
 };
 
+// ============================================================
+//  Test Case 7 — Kiểm tra thuật toán giải thích XAI
+// ============================================================
+class XAIEvaluationTest : public TestCase {
+public:
+    XAIEvaluationTest() : TestCase("RiskEvaluator", "XAIEvaluationTest") {}
+    void run_logic() override {
+        auto model = make_network();
+        std::vector<double> features = {2.0, 3.0, 1.0, 0.5}; // Đặc trưng giả định
+        
+        // Cố tình đẩy trọng số lớp đầu tiên của thuộc tính Debt (index 1) lên mức siêu cao
+        auto params = model.get_first_layer_parameters();
+        if (!params.empty()) {
+            Matrix* weights = params[0];
+            for (int j = 0; j < weights->get_cols(); ++j) {
+                (*weights)(1, j) = 10.0; // Làm cho nợ có lực đóng góp mạnh nhất
+                (*weights)(0, j) = 0.1;
+                (*weights)(2, j) = 0.1;
+                (*weights)(3, j) = 0.1;
+            }
+        }
+        
+        std::string reason = RiskEvaluator::evaluate_risk_factors(features, model, 0.8);
+        if (reason.find("Dư nợ hiện tại quá cao") == std::string::npos) {
+            throw std::runtime_error("XAI không tìm ra nguyên nhân Dư nợ cao. Output: " + reason);
+        }
+    }
+};
+
 // ── Main: Đăng ký toàn bộ Test Cases → Kích hoạt Runner ────────────────────
 int main() {
     Logger::log_info("He thong kiem thu tu dong khoi dong...");
@@ -174,7 +203,7 @@ int main() {
 
     // Nhóm 3 — Xử lý Dữ liệu CSV
     runner.register_test(std::make_unique<FileNotFoundTest>());
-    runner.register_test(std::make_unique<MinMaxScalerTest>());
+    runner.register_test(std::make_unique<RawCSVLoaderTest>());
 
     // Nhóm 4 — Pipeline Số học (Z-score & Clipping)
     runner.register_test(std::make_unique<ZScoreAtMeanTest>());
@@ -185,6 +214,7 @@ int main() {
     // Nhóm 5 — RiskEvaluator (Exception & Output Range)
     runner.register_test(std::make_unique<EmptyFeatureExceptionTest>());
     runner.register_test(std::make_unique<OutputRangeTest>());
+    runner.register_test(std::make_unique<XAIEvaluationTest>());
 
     return runner.run_all();
 }

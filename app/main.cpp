@@ -4,6 +4,7 @@
 // ============================================================
 #include "riskguard/utils/Dashboard.hpp"
 #include "riskguard/utils/DataPipeline.hpp"
+#include "riskguard/utils/DataLoader.hpp"
 #include "riskguard/network/NeuralNetwork.hpp"
 #include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
@@ -109,23 +110,12 @@ static NeuralNetwork build_network() {
     return net;
 }
 
-// ── Thiết lập DataPipeline từ phân phối dataset.csv ─────────────────────────
-static DataPipeline build_pipeline() {
-    DataPipeline pipeline;
-    pipeline.set_income_params(70000.0, 30000.0);
-    pipeline.set_debt_params(15000.0, 10000.0);
-    pipeline.set_delinquency_params(0.5, 0.5);
-    pipeline.set_age_params(45.0, 15.0);
-    return pipeline;
-}
-
 // ── Xử lý một phiên thẩm định đầy đủ ───────────────────────────────────────
-static void run_single_assessment(Dashboard& db, DataPipeline& pipeline, NeuralNetwork& model) {
+static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, NeuralNetwork& model) {
     std::cout << "\n"
               << ansi::CYAN << " ── Nhập thông tin hồ sơ khách hàng ──────────────────\n"
               << ansi::RESET;
 
-    // Thu thập dữ liệu thô qua bộ giáp nhập liệu an toàn
     double income      = db.getSafeDouble(
         "  ▶ Thu nhập hàng năm  (VND, 0 - 100.000.000.000): ",
         0.0, 100'000'000'000.0);
@@ -138,31 +128,77 @@ static void run_single_assessment(Dashboard& db, DataPipeline& pipeline, NeuralN
     int    age         = db.getSafeInt(
         "  ▶ Tuổi khách hàng (1 - 200): ", 1, 200);
 
-    // Chuẩn hóa Z-score + kẹp biên [-3.0, 3.0]
     std::vector<double> features = pipeline.transform(income, debt,
                                                        delinquency,
                                                        static_cast<double>(age));
 
-    // Hiệu ứng phân tích 3 giai đoạn
     run_cognitive_assessment(features);
 
-    // Suy luận xác suất vỡ nợ qua RiskEvaluator
     double risk_prob = RiskEvaluator::predict_approval_rate(features, model);
+    std::string reason = RiskEvaluator::evaluate_risk_factors(features, model, risk_prob);
 
-    // Hiển thị thẻ kết quả cuối cùng
-    db.displayAssessmentCard(risk_prob, "Phan tich du lieu thu cong qua CLI");
+    db.displayAssessmentCard(risk_prob, reason);
+}
+
+// ── Khởi tạo & Huấn luyện mạng tự động ──────────────────────────────────────
+static void startup_training(Dashboard& db, NeuralNetwork& model, DataPipeline& pipeline) {
+    DataLoader loader;
+    std::cout << ansi::YELLOW << "[HỆ THỐNG] Đang tải dữ liệu từ data/dataset.csv..." << ansi::RESET << std::endl;
+    Matrix raw_data = loader.loadRawCSV("data/dataset.csv");
+
+    if (raw_data.get_rows() == 0) {
+        std::cerr << ansi::BOLD << "\033[1;31m[LỖI] Không thể nạp dataset. CSV trống hoặc sai đường dẫn.\033[0m\n";
+        return;
+    }
+
+    // 1. Phân tích tham số tự động cho DataPipeline
+    std::cout << ansi::YELLOW << "[HỆ THỐNG] Phân tích phân phối thống kê từ dữ liệu..." << ansi::RESET << std::endl;
+    pipeline.fit(raw_data);
+
+    // 2. Chuẩn hóa tập dữ liệu bằng Z-score
+    Matrix normalized_data = pipeline.transform(raw_data);
+
+    // 3. Tách Features (X) và Targets (Y)
+    int rows = normalized_data.get_rows();
+    int cols = normalized_data.get_cols();
+    Matrix X(rows, 4);
+    Matrix Y(rows, 1);
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            X(i, j) = normalized_data(i, j);
+        }
+        Y(i, 0) = normalized_data(i, 4); // Cột thứ 5 là nhãn
+    }
+
+    // 4. Huấn luyện mạng
+    int epochs = 50;
+    double learning_rate = 0.05;
+    for (int epoch = 1; epoch <= epochs; ++epoch) {
+        Matrix predictions = model.forward(X);
+        double loss = model.calculateBCELoss(predictions, Y);
+        Matrix gradient = model.calculateBCEGradient(predictions, Y);
+        
+        model.backward(gradient);
+        model.update_parameters(learning_rate);
+        
+        db.showTrainingProgress(epoch, epochs, loss);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20)); // Delay nhỏ để thấy hiệu ứng
+    }
 }
 
 // ── Entry Point ──────────────────────────────────────────────────────────────
 int main() {
     try {
         Dashboard     db;
-        NeuralNetwork model    = build_network();
-        DataPipeline  pipeline = build_pipeline();
+        NeuralNetwork model = build_network();
+        DataPipeline  pipeline;
+
+        // Khởi động huấn luyện (Runtime Training)
+        startup_training(db, model, pipeline);
 
         const std::vector<std::string> menu_options = {
-            "Nhan ho so & Tham dinh rui ro tin dung",
-            "Thoat he thong"
+            "Nhận hồ sơ & Thẩm định rủi ro tín dụng",
+            "Thoát hệ thống"
         };
 
         while (true) {
@@ -173,7 +209,7 @@ int main() {
                 run_single_assessment(db, pipeline, model);
             } else {
                 std::cout << "\n" << ansi::CYAN
-                          << "[HE THONG] He thong da dong an toan. Hen gap lai!\n"
+                          << "[HỆ THỐNG] Hệ thống đã đóng an toàn. Hẹn gặp lại!\n"
                           << ansi::RESET << "\n";
                 break;
             }

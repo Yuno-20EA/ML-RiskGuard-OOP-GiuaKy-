@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include "riskguard/core/Matrix.hpp"
 
 namespace riskguard {
 
@@ -9,15 +10,24 @@ class DataPipeline {
 public:
     DataPipeline() = default;
 
-    // Các hàm thiết lập tham số chuẩn hóa (mean, std_dev)
+    // Tự động tính toán Mean và StdDev từ ma trận dữ liệu thô (fit)
+    // Giả định 4 cột đầu tiên là: Income, Debt, Delinquency, Age
+    void fit(const Matrix& raw_data);
+
+    // Các hàm thiết lập tham số thủ công (dành cho test case hoặc khi đã biết trước phân phối)
     void set_income_params(double mean, double std_dev);
     void set_debt_params(double mean, double std_dev);
     void set_delinquency_params(double mean, double std_dev);
     void set_age_params(double mean, double std_dev);
 
-    // Chuẩn hóa Z-score có kẹp biên trong khoảng [-3.0, 3.0] để chặn điểm ngoại lệ
+    // Chuẩn hóa Z-score có kẹp biên trong khoảng [-3.0, 3.0]
+    // 1. Cho một khách hàng đơn lẻ
     std::vector<double> transform(double income, double debt,
                                   double delinquency, double age) const;
+    
+    // 2. Cho toàn bộ tập dữ liệu (training)
+    // Chỉ chuẩn hóa 4 cột đầu, giữ nguyên cột nhãn (nếu có)
+    Matrix transform(const Matrix& raw_data) const;
 
 private:
     static constexpr double EPSILON        = 1e-7;
@@ -29,7 +39,7 @@ private:
     double delinquency_mean{0.0};  double delinquency_std_dev{1.0};
     double age_mean{0.0};          double age_std_dev{1.0};
 
-    // Chuẩn hóa Z-score rồi kẹp biên
+    // Hàm nội bộ tính z-score và kẹp biên
     static double zscore_clip(double value, double mean, double std_dev);
 };
 

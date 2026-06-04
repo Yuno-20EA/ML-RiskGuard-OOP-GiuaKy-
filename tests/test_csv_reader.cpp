@@ -16,7 +16,7 @@ public:
         bool handled = false;
 
         Logger::profile("Kiểm tra xử lý ngoại lệ khi thiếu File CSV", [&]() {
-            Matrix m = loader.loadAndNormalize(fake_filename);
+            Matrix m = loader.loadRawCSV(fake_filename);
             if (m.get_rows() == 0 && m.get_cols() == 0) {
                 handled = true; 
             }
@@ -28,27 +28,28 @@ public:
     }
 };
 
-class MinMaxScalerTest : public TestCase {
+class RawCSVLoaderTest : public TestCase {
 public:
-    MinMaxScalerTest() : TestCase("DataProcessingTest", "test_min_max_scaler") {}
+    RawCSVLoaderTest() : TestCase("DataProcessingTest", "test_raw_csv_loader") {}
     void run_logic() override {
         // Create a dummy CSV for testing
         std::string temp_csv = "temp_test.csv";
         std::ofstream out(temp_csv);
-        out << "Header\n0.0\n50.0\n100.0\n";
+        out << "Header\n0.0, 1.1\n50.0, 2.2\n100.0, 3.3\n";
         out.close();
 
         DataLoader loader;
-        Matrix scaled_data = Logger::profile("Chuẩn hóa dữ liệu Min-Max [0, 1]", [&]() {
-            return loader.loadAndNormalize(temp_csv);
+        Matrix raw_data = Logger::profile("Nạp dữ liệu thô từ CSV", [&]() {
+            return loader.loadRawCSV(temp_csv);
         });
 
         std::remove(temp_csv.c_str());
 
-        OOP_ASSERT_EQ(scaled_data.get_rows(), 3);
-        OOP_ASSERT_EQ(scaled_data.get_cols(), 1);
-        OOP_ASSERT_NEAR(scaled_data(0,0), 0.0, 1e-5);
-        OOP_ASSERT_NEAR(scaled_data(1,0), 0.5, 1e-5);
-        OOP_ASSERT_NEAR(scaled_data(2,0), 1.0, 1e-5);
+        OOP_ASSERT_EQ(raw_data.get_rows(), 3);
+        OOP_ASSERT_EQ(raw_data.get_cols(), 2);
+        OOP_ASSERT_NEAR(raw_data(0,0), 0.0, 1e-5);
+        OOP_ASSERT_NEAR(raw_data(1,0), 50.0, 1e-5);
+        OOP_ASSERT_NEAR(raw_data(2,0), 100.0, 1e-5);
+        OOP_ASSERT_NEAR(raw_data(2,1), 3.3, 1e-5);
     }
 };
