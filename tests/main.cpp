@@ -1,131 +1,190 @@
 // ============================================================
 //  RiskGuard ML Framework — tests/main.cpp
-//  Bộ Unit Test tự động bảo vệ số học hệ thống
+//  Hệ thống Unit Test tự động (Unity Build Pattern)
 // ============================================================
 #include "test_runner.hpp"
 #include "logger.hpp"
 
-// Unity Build: gộp tất cả test case vào một translation unit
+// Unity Build: gộp tất cả các translation unit test vào một file
 #include "test_matrix.cpp"
 #include "test_layers.cpp"
 #include "test_csv_reader.cpp"
 
-// ── Thêm include riêng cho test DataPipeline & RiskEvaluator ────────────────
+// ── Include riêng cho test DataPipeline & RiskEvaluator ─────────────────────
 #include "riskguard/utils/DataPipeline.hpp"
 #include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/network/NeuralNetwork.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
 #include "riskguard/layers/SigmoidLayer.hpp"
-#include <cassert>
+#include <cmath>
 #include <stdexcept>
 
 using namespace riskguard;
 
+// ── Hàm tiện ích nội bộ: dựng pipeline đã cấu hình sẵn ─────────────────────
+static DataPipeline make_configured_pipeline() {
+    DataPipeline p;
+    p.set_income_params(70000.0, 30000.0);
+    p.set_debt_params(15000.0, 10000.0);
+    p.set_delinquency_params(0.5, 0.5);
+    p.set_age_params(45.0, 15.0);
+    return p;
+}
+
+// ── Hàm tiện ích nội bộ: dựng mạng nơ-ron 4→8→1 ────────────────────────────
+static NeuralNetwork make_network() {
+    NeuralNetwork net;
+    net.add_layer(std::make_unique<LinearLayer>(4, 8));
+    net.add_layer(std::make_unique<SigmoidLayer>());
+    net.add_layer(std::make_unique<LinearLayer>(8, 1));
+    net.add_layer(std::make_unique<SigmoidLayer>());
+    return net;
+}
+
 // ============================================================
-//  Test Case 1: Kiểm thử tính đúng đắn của Z-score
+//  Test Case 1 — Z-score tại điểm mean → đầu ra phải = 0.0
 // ============================================================
-class ZScoreNormalizationTest : public TestCase {
+class ZScoreAtMeanTest : public TestCase {
 public:
-    ZScoreNormalizationTest() : TestCase("DataPipeline", "ZScoreNormalizationTest") {}
-
+    ZScoreAtMeanTest() : TestCase("DataPipeline", "ZScoreAtMeanTest") {}
     void run_logic() override {
-        DataPipeline pipeline;
-        // Thiết lập tham số cố định từ phân phối dataset.csv
-        pipeline.set_income_params(70000.0, 30000.0);
-        pipeline.set_debt_params(15000.0, 10000.0);
-        pipeline.set_delinquency_params(0.5, 0.5);
-        pipeline.set_age_params(45.0, 15.0);
-
-        // Mẫu dữ liệu lý tưởng nằm chính xác tại mean → Z-score phải = 0.0
-        auto features = pipeline.transform(70000.0, 15000.0, 0.5, 45.0);
-
-        OOP_ASSERT_EQ(static_cast<int>(features.size()), 4);
-        OOP_ASSERT_NEAR(features[0], 0.0, 1e-9); // Income z = 0
-        OOP_ASSERT_NEAR(features[1], 0.0, 1e-9); // Debt z = 0
-        OOP_ASSERT_NEAR(features[2], 0.0, 1e-9); // Delinquency z = 0
-        OOP_ASSERT_NEAR(features[3], 0.0, 1e-9); // Age z = 0
+        auto pipeline = make_configured_pipeline();
+        // Đưa vào chính xác các giá trị mean → Z-score = 0.0 trước khi clamp
+        auto f = pipeline.transform(70000.0, 15000.0, 0.5, 45.0);
+        OOP_ASSERT_EQ(static_cast<int>(f.size()), 4);
+        OOP_ASSERT_NEAR(f[0], 0.0, 1e-9);
+        OOP_ASSERT_NEAR(f[1], 0.0, 1e-9);
+        OOP_ASSERT_NEAR(f[2], 0.0, 1e-9);
+        OOP_ASSERT_NEAR(f[3], 0.0, 1e-9);
     }
 };
 
 // ============================================================
-//  Test Case 2: Kiểm thử kẹp biên (Clipping) giá trị ngoại lệ
+//  Test Case 2 — Giá trị income cực đại → clamp tại +3.0
 // ============================================================
-class OutlierClippingTest : public TestCase {
+class IncomeOutlierClampTest : public TestCase {
 public:
-    OutlierClippingTest() : TestCase("DataPipeline", "OutlierClippingTest") {}
-
+    IncomeOutlierClampTest() : TestCase("DataPipeline", "IncomeOutlierClampTest") {}
     void run_logic() override {
-        DataPipeline pipeline;
-        pipeline.set_income_params(70000.0, 30000.0);
-        pipeline.set_debt_params(15000.0, 10000.0);
-        pipeline.set_delinquency_params(0.5, 0.5);
-        pipeline.set_age_params(45.0, 15.0);
-
-        // Thu nhập cực đại vô lý: 10 tỷ → Z-score thô = (1e10 - 70000) / 30000 ≈ 333.000
-        // Sau khi clamp, đặc trưng income phải được kẹp cứng về 3.0
-        auto features = pipeline.transform(10'000'000'000.0, 15000.0, 0.5, 45.0);
-
-        OOP_ASSERT_NEAR(features[0], 3.0, 1e-9); // income phải bị kẹp tại 3.0
-        OOP_ASSERT_NEAR(features[1], 0.0, 1e-9); // debt vẫn bình thường
+        auto pipeline = make_configured_pipeline();
+        // Income = 10 tỷ: Z-score thô ≈ 333,000 → phải bị kẹp về 3.0
+        auto f = pipeline.transform(10'000'000'000.0, 15000.0, 0.5, 45.0);
+        OOP_ASSERT_NEAR(f[0],  3.0, 1e-9);
+        OOP_ASSERT_NEAR(f[1],  0.0, 1e-9);
+        OOP_ASSERT_NEAR(f[2],  0.0, 1e-9);
+        OOP_ASSERT_NEAR(f[3],  0.0, 1e-9);
     }
 };
 
 // ============================================================
-//  Test Case 3: Kiểm thử ngoại lệ RiskEvaluator (vector rỗng)
+//  Test Case 3 — Delinquency cực lớn → clamp tại +3.0
 // ============================================================
-class EmptyFeatureVectorTest : public TestCase {
+class DelinquencyOutlierClampTest : public TestCase {
 public:
-    EmptyFeatureVectorTest() : TestCase("RiskEvaluator", "EmptyFeatureVectorTest") {}
-
+    DelinquencyOutlierClampTest() : TestCase("DataPipeline", "DelinquencyOutlierClampTest") {}
     void run_logic() override {
-        NeuralNetwork model;
-        model.add_layer(std::make_unique<LinearLayer>(4, 8));
-        model.add_layer(std::make_unique<SigmoidLayer>());
-        model.add_layer(std::make_unique<LinearLayer>(8, 1));
-        model.add_layer(std::make_unique<SigmoidLayer>());
+        auto pipeline = make_configured_pipeline();
+        // Delinquency = 100 (cực đại được phép): Z-score = (100 - 0.5) / 0.5 = 199 → clamp 3.0
+        auto f = pipeline.transform(70000.0, 15000.0, 100.0, 45.0);
+        OOP_ASSERT_NEAR(f[2], 3.0, 1e-9);
+    }
+};
 
-        std::vector<double> empty_features;
-        bool threw_correct_exception = false;
+// ============================================================
+//  Test Case 4 — Xác minh Z-score đúng toán học tại 1 std_dev
+// ============================================================
+class ZScoreOneStdDevTest : public TestCase {
+public:
+    ZScoreOneStdDevTest() : TestCase("DataPipeline", "ZScoreOneStdDevTest") {}
+    void run_logic() override {
+        auto pipeline = make_configured_pipeline();
+        // Income = 70000 + 30000 = 100000 → Z = 1.0 (nằm trong [-3,3])
+        auto f = pipeline.transform(100000.0, 15000.0, 0.5, 45.0);
+        OOP_ASSERT_NEAR(f[0], 1.0, 1e-9);
+        // Age = 45 - 15 = 30 → Z = -1.0
+        auto f2 = pipeline.transform(70000.0, 15000.0, 0.5, 30.0);
+        OOP_ASSERT_NEAR(f2[3], -1.0, 1e-9);
+    }
+};
 
+// ============================================================
+//  Test Case 5 — RiskEvaluator ném std::invalid_argument khi vector rỗng
+// ============================================================
+class EmptyFeatureExceptionTest : public TestCase {
+public:
+    EmptyFeatureExceptionTest() : TestCase("RiskEvaluator", "EmptyFeatureExceptionTest") {}
+    void run_logic() override {
+        auto model = make_network();
+        std::vector<double> empty;
+        bool caught = false;
         try {
-            RiskEvaluator::predict_approval_rate(empty_features, model);
+            RiskEvaluator::predict_approval_rate(empty, model);
         } catch (const std::invalid_argument&) {
-            // Phải bắt đúng kiểu ngoại lệ std::invalid_argument
-            threw_correct_exception = true;
+            caught = true;
         } catch (...) {
-            throw std::runtime_error("Sai loại ngoại lệ — kỳ vọng std::invalid_argument");
+            throw std::runtime_error("Sai loai ngoai le — ky vong std::invalid_argument");
         }
+        if (!caught)
+            throw std::runtime_error("RiskEvaluator khong nem ngoai le khi vector rong");
+    }
+};
 
-        if (!threw_correct_exception) {
-            throw std::runtime_error("RiskEvaluator không ném ngoại lệ khi nhận vector rỗng");
+// ============================================================
+//  Test Case 6 — Đầu ra RiskEvaluator luôn nằm trong [0.0, 1.0]
+// ============================================================
+class OutputRangeTest : public TestCase {
+public:
+    OutputRangeTest() : TestCase("RiskEvaluator", "OutputRangeTest") {}
+    void run_logic() override {
+        auto pipeline = make_configured_pipeline();
+        auto model    = make_network();
+
+        // Thử nhiều tổ hợp đặc trưng khác nhau
+        const std::vector<std::tuple<double,double,double,double>> samples = {
+            {70000.0, 15000.0, 0.5,  45.0},  // Khách hàng trung bình
+            {10000.0, 90000.0, 80.0, 25.0},  // Rủi ro rất cao
+            {200000.0, 500.0,  0.0,  60.0},  // Rủi ro thấp
+        };
+
+        for (const auto& [inc, dbt, del, age] : samples) {
+            auto f = pipeline.transform(inc, dbt, del, age);
+            double prob = RiskEvaluator::predict_approval_rate(f, model);
+            if (prob < 0.0 || prob > 1.0)
+                throw std::runtime_error("Xac suat ngoai khoang [0.0, 1.0]: " +
+                                         std::to_string(prob));
         }
     }
 };
 
-// ── Hàm main: đăng ký toàn bộ test cases và kích hoạt runner ────────────────
+// ── Main: Đăng ký toàn bộ Test Cases → Kích hoạt Runner ────────────────────
 int main() {
-    Logger::log_info("Hệ thống kiểm thử tự động bắt đầu khởi tạo...");
+    Logger::log_info("He thong kiem thu tu dong khoi dong...");
 
     TestRunner& runner = TestRunner::get_instance();
 
-    // Nhóm 1: Kiểm thử Ma Trận
+    // Nhóm 1 — Ma Trận
     runner.register_test(std::make_unique<MatrixMultiplicationTest>());
     runner.register_test(std::make_unique<MatrixBroadcastingTest>());
     runner.register_test(std::make_unique<MatrixTransposeTest>());
 
-    // Nhóm 2: Kiểm thử Logic AI (Layers & Loss)
+    // Nhóm 2 — Logic AI (Layers & Loss)
     runner.register_test(std::make_unique<SigmoidActivationTest>());
     runner.register_test(std::make_unique<LinearForwardTest>());
     runner.register_test(std::make_unique<BCELossGradientTest>());
 
-    // Nhóm 3: Kiểm thử Xử lý Dữ liệu (CSV)
+    // Nhóm 3 — Xử lý Dữ liệu CSV
     runner.register_test(std::make_unique<FileNotFoundTest>());
     runner.register_test(std::make_unique<MinMaxScalerTest>());
 
-    // Nhóm 4: Kiểm thử Pipeline Số học & RiskEvaluator
-    runner.register_test(std::make_unique<ZScoreNormalizationTest>());
-    runner.register_test(std::make_unique<OutlierClippingTest>());
-    runner.register_test(std::make_unique<EmptyFeatureVectorTest>());
+    // Nhóm 4 — Pipeline Số học (Z-score & Clipping)
+    runner.register_test(std::make_unique<ZScoreAtMeanTest>());
+    runner.register_test(std::make_unique<IncomeOutlierClampTest>());
+    runner.register_test(std::make_unique<DelinquencyOutlierClampTest>());
+    runner.register_test(std::make_unique<ZScoreOneStdDevTest>());
+
+    // Nhóm 5 — RiskEvaluator (Exception & Output Range)
+    runner.register_test(std::make_unique<EmptyFeatureExceptionTest>());
+    runner.register_test(std::make_unique<OutputRangeTest>());
 
     return runner.run_all();
 }

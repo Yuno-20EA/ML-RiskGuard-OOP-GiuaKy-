@@ -1,6 +1,6 @@
 // ============================================================
 //  RiskGuard ML Framework — app/main.cpp
-//  Giao diện Cyberpunk CLI tương tác nhập liệu khách hàng
+//  Giao diện Cyberpunk CLI tương tác — Staged Animated Inference
 // ============================================================
 #include "riskguard/utils/Dashboard.hpp"
 #include "riskguard/utils/DataPipeline.hpp"
@@ -8,13 +8,98 @@
 #include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
 #include "riskguard/layers/SigmoidLayer.hpp"
-#include "riskguard/utils/DataLoader.hpp"
 #include <iostream>
+#include <iomanip>
+#include <thread>
+#include <chrono>
 #include <memory>
+#include <vector>
+#include <string>
 
 using namespace riskguard;
 
-// ── Khởi tạo kiến trúc mạng nơ-ron chuẩn 4→8→1 ────────────────────────────
+// ── Mã màu nội bộ (ANSI) ────────────────────────────────────────────────────
+namespace ansi {
+    constexpr auto RESET    = "\033[0m";
+    constexpr auto BOLD     = "\033[1m";
+    constexpr auto YELLOW   = "\033[33m";
+    constexpr auto CYAN     = "\033[1;36m";
+    constexpr auto MAGENTA  = "\033[1;35m";
+    constexpr auto GREEN    = "\033[1;32m";
+    constexpr auto GRAY     = "\033[90m";
+}
+
+// ── Vẽ thanh tiến trình trên một dòng (dùng \r để ghi đè) ──────────────────
+static void render_progress_bar(std::string_view label,
+                                 std::string_view color,
+                                 int total_steps,
+                                 int step_delay_ms) {
+    constexpr int BAR_WIDTH = 36;
+    for (int step = 0; step <= total_steps; ++step) {
+        int filled = (step * BAR_WIDTH) / total_steps;
+        int pct    = (step * 100) / total_steps;
+
+        std::cout << "\r  " << color << label << ansi::RESET
+                  << " [";
+        for (int k = 0; k < BAR_WIDTH; ++k)
+            std::cout << (k < filled ? "█" : ansi::GRAY + std::string("░") + ansi::RESET);
+        std::cout << "] "
+                  << color << std::setw(3) << pct << "%" << ansi::RESET
+                  << std::flush;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(step_delay_ms));
+    }
+    std::cout << "\n";
+}
+
+// ── Hiệu ứng phân tích 3 giai đoạn [AI COGNITIVE ASSESSMENT] ───────────────
+static void run_cognitive_assessment(const std::vector<double>& features) {
+    std::cout << "\n"
+              << ansi::CYAN << ansi::BOLD
+              << " ╔══════════════════════════════════════════════════╗\n"
+              << " ║           AI COGNITIVE ASSESSMENT                ║\n"
+              << " ╚══════════════════════════════════════════════════╝"
+              << ansi::RESET << "\n\n";
+
+    // ── Giai đoạn 1: Data Sanitization & Clipping ─────────────────────────
+    std::cout << ansi::YELLOW << ansi::BOLD
+              << " [PROCESSING] Data Sanitization & Clipping\n"
+              << ansi::RESET;
+    render_progress_bar("[PROCESSING]", ansi::YELLOW, 20, 40);
+
+    // In kết quả Z-score đã làm sạch
+    const std::string labels[] = {"Income", "Debt  ", "Delinq", "Age   "};
+    std::cout << ansi::GRAY << "  ├─ Feature vector (Z-score clamped to [-3.0, 3.0]):\n";
+    for (std::size_t i = 0; i < features.size(); ++i) {
+        std::cout << "  │   " << labels[i] << " = "
+                  << ansi::YELLOW << std::fixed << std::setprecision(6)
+                  << features[i] << ansi::RESET << "\n";
+    }
+    std::cout << ansi::GRAY << "  └─ Sanitization complete.\n" << ansi::RESET << "\n";
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // ── Giai đoạn 2: Matrix Propagation ───────────────────────────────────
+    std::cout << ansi::CYAN << ansi::BOLD
+              << " [COMPUTING]  Matrix Propagation  (1×4 → 1×8)\n"
+              << ansi::RESET;
+    render_progress_bar("[COMPUTING] ", ansi::CYAN, 20, 35);
+    std::cout << ansi::GRAY
+              << "  └─ Weight matrices multiplied across hidden layer.\n"
+              << ansi::RESET << "\n";
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+
+    // ── Giai đoạn 3: Neural Network Activation ────────────────────────────
+    std::cout << ansi::MAGENTA << ansi::BOLD
+              << " [RESOLVING]  Neural Network Sigmoid Activation\n"
+              << ansi::RESET;
+    render_progress_bar("[RESOLVING] ", ansi::MAGENTA, 20, 30);
+    std::cout << ansi::GRAY
+              << "  └─ Output neuron activated → probability in [0.0, 1.0].\n"
+              << ansi::RESET << "\n";
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+}
+
+// ── Khởi tạo kiến trúc mạng nơ-ron 4→8→1 ───────────────────────────────────
 static NeuralNetwork build_network() {
     NeuralNetwork net;
     net.add_layer(std::make_unique<LinearLayer>(4, 8));
@@ -24,10 +109,9 @@ static NeuralNetwork build_network() {
     return net;
 }
 
-// ── Thiết lập tham số thống kê từ phân phối dataset.csv ─────────────────────
+// ── Thiết lập DataPipeline từ phân phối dataset.csv ─────────────────────────
 static DataPipeline build_pipeline() {
     DataPipeline pipeline;
-    // Các tham số Mean/StdDev được tính từ phân phối thực tế của dataset.csv
     pipeline.set_income_params(70000.0, 30000.0);
     pipeline.set_debt_params(15000.0, 10000.0);
     pipeline.set_delinquency_params(0.5, 0.5);
@@ -35,37 +119,43 @@ static DataPipeline build_pipeline() {
     return pipeline;
 }
 
-// ── Vòng lặp xử lý một lần đánh giá khách hàng ─────────────────────────────
+// ── Xử lý một phiên thẩm định đầy đủ ───────────────────────────────────────
 static void run_single_assessment(Dashboard& db, DataPipeline& pipeline, NeuralNetwork& model) {
-    std::cout << "\n";
+    std::cout << "\n"
+              << ansi::CYAN << " ── Nhập thông tin hồ sơ khách hàng ──────────────────\n"
+              << ansi::RESET;
 
-    // Thu thập dữ liệu thô từ bàn phím qua bộ giáp nhập liệu an toàn
-    double income      = db.getSafeDouble("  ▶ Nhập Thu nhập hàng năm (VND): ", 0.0, 1e9);
-    double debt        = db.getSafeDouble("  ▶ Nhập Tổng dư nợ hiện tại (VND): ", 0.0, 1e9);
-    double delinquency = db.getSafeDouble("  ▶ Nhập Số lần trễ hạn (0 - 100): ", 0.0, 100.0);
-    int    age         = db.getSafeInt   ("  ▶ Nhập Tuổi của khách hàng: ", 18, 100);
+    // Thu thập dữ liệu thô qua bộ giáp nhập liệu an toàn
+    double income      = db.getSafeDouble("  ▶ Thu nhập hàng năm  (VND, 0 - 1,000,000,000): ",
+                                          0.0, 1'000'000'000.0);
+    double debt        = db.getSafeDouble("  ▶ Tổng dư nợ         (VND, 0 - 1,000,000,000): ",
+                                          0.0, 1'000'000'000.0);
+    double delinquency = db.getSafeDouble("  ▶ Số lần trễ hạn     (0 - 100): ",
+                                          0.0, 100.0);
+    int    age         = db.getSafeInt   ("  ▶ Tuổi khách hàng    (18 - 100): ", 18, 100);
 
-    // Chuẩn hóa Z-score + kẹp biên [-3.0, 3.0] qua DataPipeline
+    // Chuẩn hóa Z-score + kẹp biên [-3.0, 3.0]
     std::vector<double> features = pipeline.transform(income, debt,
                                                        delinquency,
                                                        static_cast<double>(age));
 
-    // Dự đoán xác suất vỡ nợ (default) qua RiskEvaluator
+    // Hiệu ứng phân tích 3 giai đoạn
+    run_cognitive_assessment(features);
+
+    // Suy luận xác suất vỡ nợ qua RiskEvaluator
     double risk_prob = RiskEvaluator::predict_approval_rate(features, model);
 
-    // Hiển thị kết quả dưới dạng thẻ thẩm định ASCII Art
-    db.displayAssessmentCard(risk_prob, "Du lieu nguoi dung nhap tu ban phim");
+    // Hiển thị thẻ kết quả cuối cùng
+    db.displayAssessmentCard(risk_prob, "Phan tich du lieu thu cong qua CLI");
 }
 
-// ── Điểm khởi đầu toàn bộ hệ thống ─────────────────────────────────────────
+// ── Entry Point ──────────────────────────────────────────────────────────────
 int main() {
     try {
-        // Khởi tạo đối tượng Dashboard (Tự kích hoạt ANSI & UTF-8 trên Windows)
-        Dashboard db;
-        NeuralNetwork model = build_network();
+        Dashboard     db;
+        NeuralNetwork model    = build_network();
         DataPipeline  pipeline = build_pipeline();
 
-        // Danh sách tùy chọn Menu động
         const std::vector<std::string> menu_options = {
             "Nhan ho so & Tham dinh rui ro tin dung",
             "Thoat he thong"
@@ -73,21 +163,21 @@ int main() {
 
         while (true) {
             db.showMenu(menu_options);
-
             int choice = db.getSafeInt("", 1, static_cast<int>(menu_options.size()));
 
             if (choice == 1) {
                 run_single_assessment(db, pipeline, model);
             } else {
-                std::cout << "\n\033[1;36m[SYSTEM] Hệ thống đã đóng an toàn. Tạm biệt!\033[0m\n\n";
+                std::cout << "\n" << ansi::CYAN
+                          << "[SYSTEM] He thong da dong an toan. Tam biet!\n"
+                          << ansi::RESET << "\n";
                 break;
             }
         }
 
     } catch (const std::exception& e) {
-        std::cerr << "\033[1;31m[FATAL EXCEPTION] " << e.what() << "\033[0m\n";
+        std::cerr << ansi::BOLD << "\033[1;31m[FATAL] " << e.what() << ansi::RESET << "\n";
         return 1;
     }
-
     return 0;
 }
