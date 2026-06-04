@@ -135,7 +135,9 @@ static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, N
 
     run_cognitive_assessment(features);
 
-    double risk_prob = RiskEvaluator::predict_approval_rate(features, model);
+    double default_prob = RiskEvaluator::predict_approval_rate(features, model);
+    double risk_prob = default_prob; // Xác suất rủi ro chính là xác suất Default
+    double approval_rate = 1.0 - default_prob; // Tỷ lệ duyệt tỷ lệ nghịch với rủi ro
     
     // Sinh lý do động (Dynamic Explainability) dựa trên dữ liệu thô và XAI
     std::string reason;
@@ -151,6 +153,7 @@ static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, N
         reason = "Hồ sơ tín dụng an toàn. Các chỉ số đều ở mức tốt.";
     }
 
+    // Hiển thị trực tiếp risk_prob cho người dùng dễ hiểu
     db.displayAssessmentCard(risk_prob, reason);
 }
 
