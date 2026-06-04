@@ -40,12 +40,14 @@ set(RISKGUARD_SOURCES
     src/layers/LinearLayer.cpp
     src/layers/SigmoidLayer.cpp
 
-    # Network
-    src/network/NeuralNetwork.cpp
-
     # Utils — Data Pipeline & Tooling
     src/utils/Dashboard.cpp
     src/utils/DataLoader.cpp
+    src/utils/DataPipeline.cpp
+
+    # Network
+    src/network/NeuralNetwork.cpp
+    src/network/RiskEvaluator.cpp
 )
 
 # ════════════════════════════════════════════════

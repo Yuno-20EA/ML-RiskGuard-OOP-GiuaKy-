@@ -167,16 +167,19 @@ ML_Guard_OOP_GiuaKy/
 ├── include/                            # Public API headers (.hpp only)
 │   └── riskguard/
 │       ├── core/
+│       │   ├── Customer.hpp            # DTO đối tượng khách hàng thuần túy
 │       │   ├── Layer.hpp               # Abstract Base Class (ABC) — Tính Trừu Tượng
 │       │   └── Matrix.hpp              # Flat memory matrix, GEMM, std::span
 │       ├── layers/
 │       │   ├── LinearLayer.hpp         # Fully connected layer (weights + biases)
 │       │   └── SigmoidLayer.hpp        # Sigmoid activation với numerical clamping
 │       ├── network/
-│       │   └── NeuralNetwork.hpp       # Forward / Backward / BCE Loss
+│       │   ├── NeuralNetwork.hpp       # Forward / Backward / BCE Loss
+│       │   └── RiskEvaluator.hpp       # Inference module thẩm định rủi ro thời gian thực
 │       └── utils/
-│           ├── Dashboard.hpp           # Terminal UI — hiển thị training progress
-│           └── DataLoader.hpp          # CSV reader, Min-Max normalization
+│           ├── Dashboard.hpp           # Giao diện Cyberpunk UI & Safe Input (C++20)
+│           ├── DataLoader.hpp          # CSV reader, Min-Max normalization
+│           └── DataPipeline.hpp        # Bộ tiền xử lý đầu vào (Z-Score, Label Encode)
 │
 ├── src/                                # Implementation files (mirror include/)
 │   ├── core/
@@ -185,10 +188,12 @@ ML_Guard_OOP_GiuaKy/
 │   │   ├── LinearLayer.cpp             # He initialization, gradient accumulation
 │   │   └── SigmoidLayer.cpp            # Sigmoid forward/backward
 │   ├── network/
-│   │   └── NeuralNetwork.cpp           # Pipeline orchestration, BCE gradient
+│   │   ├── NeuralNetwork.cpp           # Pipeline orchestration, BCE gradient
+│   │   └── RiskEvaluator.cpp           # Xử lý ma trận đầu vào/đầu ra, an toàn hằng số
 │   └── utils/
-│       ├── Dashboard.cpp               # ANSI color output, progress bar
-│       └── DataLoader.cpp              # File parsing, normalization
+│       ├── Dashboard.cpp               # Cấu hình ANSI Windows, Dynamic Menu Unicode
+│       ├── DataLoader.cpp              # File parsing, normalization
+│       └── DataPipeline.cpp            # Xử lý ngoại lệ, chống lỗi tràn số lượng (Epsilon)
 │
 ├── app/
 │   └── main.cpp                        # Entry point: step-by-step pipeline + Dashboard UI

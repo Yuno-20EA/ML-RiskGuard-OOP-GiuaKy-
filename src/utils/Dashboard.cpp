@@ -1,19 +1,41 @@
 #include "riskguard/utils/Dashboard.hpp"
 #include <iomanip>
-#include <vector>
+#include <limits>
+#include <algorithm>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+// Bộ màu Cyberpunk Terminal (ANSI Escape Codes)
 #define RESET       "\033[0m"
 #define BOLD        "\033[1m"
-#define MAGENTA     "\033[35m"
-#define YELLOW      "\033[33m"
-#define GREEN       "\033[32m"
-#define RED         "\033[31m"
+#define MAGENTA     "\033[1;35m" // Magenta sáng
+#define CYAN        "\033[1;36m" // Cyan sáng
+#define GREEN       "\033[1;32m" // Xanh lá cây sáng (Success)
+#define RED         "\033[1;31m" // Đỏ sáng (Error/Rejected)
+#define YELLOW      "\033[33m"   // Vàng (Info/Progress)
+#define GRAY        "\033[90m"   // Xám (Viền/Decor)
 
-/**
- * Vẽ tiêu đề hệ thống bằng ASCII Art.
- * Dùng MAGENTA để tạo cảm giác công nghệ cao (Cyberpunk style).
- */
-void Dashboard::drawHeader() {
+namespace riskguard {
+
+Dashboard::Dashboard() {
+#ifdef _WIN32
+    // Bật xử lý ANSI Escape Codes cho Console Windows cũ
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut != INVALID_HANDLE_VALUE) {
+        DWORD dwMode = 0;
+        if (GetConsoleMode(hOut, &dwMode)) {
+            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hOut, dwMode);
+        }
+    }
+    // Bật Output bảng mã UTF-8 để vẽ box Unicode không bị lỗi
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+}
+
+void Dashboard::drawHeader() const {
     std::cout << MAGENTA << BOLD;
     std::cout << " _______________________________________________________________" << std::endl;
     std::cout << " |                                                               |" << std::endl;
@@ -23,61 +45,104 @@ void Dashboard::drawHeader() {
     std::cout << " |  |  _ < | |  ___) | . \\ | |_| | |_| | ___) |  _ <| |_| |       |" << std::endl;
     std::cout << " |  |_| \\_\\___||____/|_|\\_\\ \\____|\\___/|____/|_| \\_\\____/       |" << std::endl;
     std::cout << " |                                                               |" << std::endl;
-    std::cout << " |              CORE ML RISK MANAGEMENT SYSTEM                   |" << std::endl;
+    std::cout << " |" << CYAN << "              CORE ML RISK MANAGEMENT SYSTEM                   " << MAGENTA << "|" << std::endl;
     std::cout << " |_______________________________________________________________|" << RESET << std::endl;
 }
 
-/**
- * Hiển thị Menu điều hướng. Sử dụng icon để tăng tính trực quan.
- */
-void Dashboard::showMenu() {
+void Dashboard::showMenu(const std::vector<std::string>& options) const {
     drawHeader();
-    std::cout << "\n" << BOLD << MAGENTA << " ✧ DANH MỤC ĐIỀU KHIỂN ✧" << RESET << std::endl;
-    std::cout << "  " << YELLOW << "▶" << RESET << " Nạp & Chuẩn hóa dữ liệu (Use Case 1)" << std::endl;
-    std::cout << "  " << YELLOW << "▶" << RESET << " Huấn luyện 'Bộ não' AI (Use Case 2)" << std::endl;
-    std::cout << "  " << YELLOW << "▶" << RESET << " Thẩm định hồ sơ cấp tốc (Use Case 3)" << std::endl;
-    std::cout << "  " << RED << "✖" << RESET << " Thoát hệ thống" << std::endl;
-    std::cout << "\n" << BOLD << MAGENTA << "⚡ Lựa chọn của bạn: " << RESET;
+    std::cout << "\n" << BOLD << CYAN << " ✧ SYSTEM CONTROL MENU ✧" << RESET << std::endl;
+    
+    if (options.empty()) return;
+
+    // Tìm độ dài chuỗi lớn nhất
+    size_t max_len = 0;
+    for (const auto& opt : options) {
+        if (opt.length() > max_len) {
+            max_len = opt.length();
+        }
+    }
+    
+    // Khoảng đệm cho UI
+    size_t inner_width = max_len + 6;
+
+    // Vẽ khung menu linh hoạt bằng Unicode
+    std::cout << GRAY << " ┌";
+    for(size_t k = 0; k < inner_width + 2; ++k) std::cout << "─";
+    std::cout << "┐" << RESET << std::endl;
+    
+    for (size_t i = 0; i < options.size(); ++i) {
+        std::cout << GRAY << " │ " << RESET 
+                  << YELLOW << "[" << i + 1 << "] " << RESET 
+                  << std::left << std::setw(static_cast<int>(max_len)) << options[i]
+                  << GRAY << "   │" << RESET << std::endl;
+    }
+    
+    std::cout << GRAY << " └";
+    for(size_t k = 0; k < inner_width + 2; ++k) std::cout << "─";
+    std::cout << "┘" << RESET << std::endl;
+    
+    std::cout << "\n" << BOLD << CYAN << "⚡ COMMAND INPUT > " << RESET;
 }
 
-/**
- * Hiển thị thanh tiến trình training AI.
- * @param epoch: vòng lặp hiện tại.
- * @param totalEpochs: tổng số vòng lặp.
- * @param loss: sai số huấn luyện.
- */
-void Dashboard::showTrainingProgress(int epoch, int totalEpochs, double loss) {
-    float progress = (float)epoch / totalEpochs;
+void Dashboard::showTrainingProgress(int epoch, int totalEpochs, double loss) const {
+    float progress = static_cast<float>(epoch) / totalEpochs;
     int barWidth = 40;
 
-    std::cout << "\r" << YELLOW << "Training: " << RESET << "[";
-    int pos = barWidth * progress;
+    std::cout << "\r" << YELLOW << "TRAINING NEURAL LINK: " << RESET << "[";
+    int pos = static_cast<int>(barWidth * progress);
     for (int i = 0; i < barWidth; ++i) {
-        if (i < pos) std::cout << "■";
-        else std::cout << " ";
+        if (i < pos) std::cout << CYAN << "■" << RESET;
+        else std::cout << GRAY << "■" << RESET;
     }
-    std::cout << "] " << int(progress * 100.0) << "% "
-              << "| Loss: " << std::fixed << std::setprecision(4) << loss << std::flush;
+    std::cout << "] " << CYAN << int(progress * 100.0) << "% " << RESET
+              << "| Loss: " << std::fixed << std::setprecision(4) << MAGENTA << loss << RESET << std::flush;
 
-    if (epoch == totalEpochs) std::cout << GREEN << " [HOÀN TẤT]" << RESET << std::endl;
+    if (epoch == totalEpochs) std::cout << GREEN << " [NETWORK SYNCHRONIZED]" << RESET << std::endl;
 }
 
-/**
- * Hiển thị bảng kết quả thẩm định rủi ro.
- * Sử dụng logic so sánh để trả về màu sắc trạng thái (Xanh: Duyệt, Đỏ: Từ chối).
- */
-void Dashboard::displayAssessmentCard(double riskProb, const std::string& mainReason) {
-    std::string status = (riskProb < 0.5) ? "DUYỆT VAY" : "TỪ CHỐI";
+void Dashboard::displayAssessmentCard(double riskProb, std::string_view mainReason) const {
+    std::string status = (riskProb < 0.5) ? "APPROVED (LOW RISK)" : "REJECTED (HIGH RISK)";
     std::string color = (riskProb < 0.5) ? GREEN : RED;
 
     std::cout << "\n" << color << BOLD;
     std::cout << "┌──────────────────────────────────────────────────────────┐" << std::endl;
-    std::cout << "│                 KẾT QUẢ THẨM ĐỊNH TÍN DỤNG               │" << std::endl;
+    std::cout << "│                 CREDIT RISK EVALUATION                   │" << std::endl;
     std::cout << "├──────────────────────────────────────────────────────────┤" << std::endl;
-    std::cout << "│  TRẠNG THÁI: " << std::left << std::setw(44) << status << "│" << std::endl;
-    std::cout << "│  XÁC SUẤT RỦI RO: " << std::fixed << std::setprecision(2)
-              << (riskProb * 100) << "%" << std::setw(34) << " " << "│" << std::endl;
+    std::cout << "│  STATUS: " << std::left << std::setw(48) << status << "│" << std::endl;
+    std::cout << "│  RISK PROBABILITY: " << std::fixed << std::setprecision(2)
+              << (riskProb * 100) << "%" << std::setw(37) << " " << "│" << std::endl;
     std::cout << "├──────────────────────────────────────────────────────────┤" << std::endl;
-    std::cout << "│  NGUYÊN NHÂN CHÍNH: " << std::left << std::setw(37) << mainReason << "│" << std::endl;
+    std::cout << "│  REASON: " << std::left << std::setw(48) << std::string(mainReason) << "│" << std::endl;
     std::cout << "└──────────────────────────────────────────────────────────┘" << RESET << std::endl;
 }
+
+int Dashboard::getSafeInt(std::string_view prompt, int min_val, int max_val) const {
+    int value;
+    while (true) {
+        std::cout << CYAN << prompt << RESET;
+        if (std::cin >> value && value >= min_val && value <= max_val) {
+            return value;
+        }
+        std::cin.clear(); // Xóa cờ lỗi
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Loại bỏ các ký tự rác trong buffer
+        std::cout << RED << BOLD << "[ERROR] Invalid input. Please enter an integer between " 
+                  << min_val << " and " << max_val << "." << RESET << std::endl;
+    }
+}
+
+double Dashboard::getSafeDouble(std::string_view prompt, double min_val, double max_val) const {
+    double value;
+    while (true) {
+        std::cout << CYAN << prompt << RESET;
+        if (std::cin >> value && value >= min_val && value <= max_val) {
+            return value;
+        }
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << RED << BOLD << "[ERROR] Invalid input. Please enter a number between " 
+                  << min_val << " and " << max_val << "." << RESET << std::endl;
+    }
+}
+
+} // namespace riskguard
