@@ -37,16 +37,17 @@ Dashboard::Dashboard() {
 
 void Dashboard::drawHeader() const {
     std::cout << MAGENTA << BOLD;
-    std::cout << " _______________________________________________________________" << std::endl;
-    std::cout << " |                                                               |" << std::endl;
-    std::cout << " |  ____  ___  ____  _  __  ____ _   _  ____  ____  ____         |" << std::endl;
-    std::cout << " |  | _ \\|_ _|/ ___|| |/ / / ___| | | |/ ___|| _ \\| _ \\        |" << std::endl;
-    std::cout << " |  | |_) || | \\___ \\| ' < | |  _| | | |\\___ \\| |_) | | | |       |" << std::endl;
-    std::cout << " |  |  _ < | |  ___) | . \\ | |_| | |_| | ___) |  _ <| |_| |       |" << std::endl;
-    std::cout << " |  |_| \\_\\___||____/|_|\\_\\ \\____|\\___/|____/|_| \\_\\____/       |" << std::endl;
-    std::cout << " |                                                               |" << std::endl;
-    std::cout << " |" << CYAN << "              HỆ THỐNG QUẢN TRỊ RỦI RO LÕI ML                  " << MAGENTA << "|" << std::endl;
-    std::cout << " |_______________________________________________________________|" << RESET << std::endl;
+    std::cout << " ___________________________________________________________________________ " << std::endl;
+    std::cout << " |                                                                         |" << std::endl;
+    std::cout << R"( |   _____  _____  _____ _  __  _____ _    _          _____  _____     |)" << std::endl;
+    std::cout << R"( |  |  __ \|_   _|/ ____| |/ / / ____| |  | |   /\   |  __ \|  __ \    |)" << std::endl;
+    std::cout << R"( |  | |__) | | | | (___ | ' / | |  __| |  | |  /  \  | |__) | |  | |   |)" << std::endl;
+    std::cout << R"( |  |  _  /  | |  \___ \|  <  | | |_ | |  | | / /\ \ |  _  /| |  | |   |)" << std::endl;
+    std::cout << R"( |  | | \ \ _| |_ ____) | . \ | |__| | |__| |/ ____ \| | \ \| |__| |   |)" << std::endl;
+    std::cout << R"( |  |_|  \_\_____|_____/|_|\_\ \_____|\____//_/    \_\_|  \_\_____/    |)" << std::endl;
+    std::cout << " |                                                                         |" << std::endl;
+    std::cout << " |" << CYAN << "                HỆ THỐNG QUẢN TRỊ RỦI RO LÕI ML                  " << MAGENTA << "|" << std::endl;
+    std::cout << " |_________________________________________________________________________|" << RESET << std::endl;
 }
 
 void Dashboard::showMenu(const std::vector<std::string>& options) const {
