@@ -1,4 +1,4 @@
-# RiskGuard ML Framework (v2.0)
+# RiskGuard ML Framework (v2.1)
 
 **RiskGuard ML Framework** là một thư viện học máy (Machine Learning) toán học thuần túy, được tối ưu hóa bằng **C++20**, thiết kế chuyên biệt cho bài toán đánh giá rủi ro tín dụng (Credit Risk Assessment). Dự án tuân thủ nghiêm ngặt nguyên tắc **Zero-dependency** (100% offline, không phụ thuộc thư viện ngoài), đảm bảo tốc độ tính toán tối đa, quản lý bộ nhớ thủ công hiệu quả và bảo mật tuyệt đối.
 
@@ -14,8 +14,8 @@ Dự án sở hữu nhiều điểm kỹ thuật ấn tượng, thể hiện tư
 4. **Gradient Clipping & Numerical Stability:** Áp dụng `epsilon = 1e-15` để chống lỗi `NaN` khi tính đạo hàm Binary Cross Entropy, kết hợp chặn trần đạo hàm để tránh bùng nổ gradient.
 5. **DataPipeline Động (Dynamic Fitting):** Hàm `fit()` tự động tính Mean và Standard Deviation từ dữ liệu thực, triệt tiêu hoàn toàn các tham số hardcode. Chuẩn hóa Z-Score kết hợp kẹp biên `[-3.0, 3.0]` bảo vệ mạng khỏi dị biệt (Outlier).
 6. **Explainable AI (XAI):** Hệ thống sinh lý do từ chối/phê duyệt dựa trực tiếp trên **Contribution Score** — tích vô hướng giữa đặc trưng đã chuẩn hóa và trọng số thực của mạng nơ-ron, thay vì dùng `if-else` cứng nhắc.
-7. **Runtime Training:** Mô hình huấn luyện 50 Epoch trực tiếp từ `dataset.csv` mỗi lần khởi động, với thanh tiến trình Cyberpunk Terminal hiển thị tổn thất theo thời gian thực.
-8. **Ổn định đường dẫn tuyệt đối (Absolute Path Resolution):** Macro `RISKGUARD_PROJECT_ROOT` được CMake nhúng vào thời điểm biên dịch, đảm bảo chương trình luôn tìm đúng `dataset.csv` dù chạy từ bất kỳ thư mục làm việc nào.
+7. **Huấn luyện Nâng cao (v2.1):** Hỗ trợ **Early Stopping** và **Learning Rate Step Decay** với tối đa 200 epochs. Tự động dừng nếu hàm mất mát không cải thiện, tối ưu thời gian huấn luyện.
+8. **Quản lý Mô hình & Lịch sử:** Tự động lưu mô hình vào `model.json` để tải lại mà không cần huấn luyện lại. Theo dõi lịch sử thẩm định chi tiết theo từng phiên làm việc.
 
 ---
 
@@ -53,7 +53,7 @@ classDiagram
         +backward(gradient: Matrix) Matrix*
         +update_parameters(learning_rate: double) void
         +get_type_name() string
-        +get_parameters() vector~Matrix*~
+        +get_parameters() vector~Matrix_ptr~
     }
 
     class LinearLayer {
@@ -73,13 +73,13 @@ classDiagram
     }
 
     class NeuralNetwork {
-        -layers: vector~unique_ptr~Layer~~
-        +add_layer(layer: unique_ptr~Layer~) void
+        -layers: vector~unique_ptr_Layer~
+        +add_layer(layer: unique_ptr_Layer) void
         +forward(input: Matrix) Matrix
         +backward(output_gradient: Matrix) void
         +update_parameters(lr: double) void
         +calculateBCELoss() double
-        +get_first_layer_parameters() vector~Matrix*~
+        +get_first_layer_parameters() vector~Matrix_ptr~
     }
 
     class Matrix {
@@ -88,12 +88,12 @@ classDiagram
         -data: vector~double~
         +operator()(r: int, c: int) double
         +get_row(r: int) span~double~
-        +gemm() void$
+        +gemm()$ void
     }
 
     class RiskEvaluator {
-        +predict_approval_rate(features, model) double$
-        +evaluate_risk_factors(features, model, prob) string$
+        +predict_approval_rate(features, model)$ double
+        +evaluate_risk_factors(features, model, prob)$ string
     }
 
     class DataPipeline {
@@ -123,43 +123,46 @@ Sơ đồ dưới đây mô tả toàn bộ luồng từ lúc khởi động đ�
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NạpCSV : DataLoader::loadRawCSV()
+    [*] --> LoadCSV : DataLoader::loadRawCSV()
 
-    state NạpCSV {
-        ĐọcFile --> XâyDựngMaTrậnThô : Bỏ qua header, parse double
+    state LoadCSV {
+        ReadFile --> BuildRawMatrix : Bỏ qua header, parse double
     }
 
-    NạpCSV --> FitPipeline : DataPipeline::fit()
+    LoadCSV --> FitPipeline : DataPipeline::fit()
 
     state FitPipeline {
-        TínhMean --> TínhStdDev : Quét toàn bộ 28,638 bản ghi
+        CalcMean --> CalcStdDev : Quét toàn bộ 28,638 bản ghi
     }
 
-    FitPipeline --> ChuẩnHóa : DataPipeline::transform(Matrix)
+    FitPipeline --> Normalize : DataPipeline::transform(Matrix)
 
-    state Vòng_Lặp_Huấn_Luyện {
+    state TrainingLoop {
         direction LR
-        ForwardPass --> TínhBCELoss
-        TínhBCELoss --> BackwardPass
-        BackwardPass --> CậpNhậtTrọngSố
+        ForwardPass --> CalcBCELoss
+        CalcBCELoss --> BackwardPass
+        BackwardPass --> UpdateWeights
     }
 
-    ChuẩnHóa --> Vòng_Lặp_Huấn_Luyện : 50 Epochs
-    Vòng_Lặp_Huấn_Luyện --> MenuChính : Mô hình sẵn sàng
+    Normalize --> CheckModel : ModelManager::loadModel()
+    CheckModel --> TrainingLoop : Không tìm thấy model.json (200 Epochs + Early Stopping)
+    CheckModel --> MainMenu : Đã nạp thành công từ model.json
+    TrainingLoop --> MainMenu : Mô hình sẵn sàng
 
-    state NhậpHồSơKháchHàng {
-        NhậpThuNhập --> NhậpDưNợ
-        NhậpDưNợ --> NhậpTrễHạn
-        NhậpTrễHạn --> NhậpTuổi
+    state InputProfile {
+        InputIncome --> InputDebt
+        InputDebt --> InputDelinquency
+        InputDelinquency --> InputAge
     }
 
-    MenuChính --> NhậpHồSơKháchHàng
-    NhậpHồSơKháchHàng --> ZScoreClipping : pipeline.transform(vector)
-    ZScoreClipping --> HiệuỨngPhânTích : Staged AI Animation (3 giai đoạn)
-    HiệuỨngPhânTích --> DựĐoán : RiskEvaluator::predict_approval_rate()
-    DựĐoán --> XAI : evaluate_risk_factors() — tính Contribution Score
-    XAI --> HiểnThịKếtQuả : displayAssessmentCard()
-    HiểnThịKếtQuả --> MenuChính
+    MainMenu --> InputProfile
+    InputProfile --> ZScoreClipping : pipeline.transform(vector)
+    ZScoreClipping --> AIAnalysis : Staged AI Animation (3 giai đoạn)
+    AIAnalysis --> Prediction : RiskEvaluator::predict_approval_rate()
+    Prediction --> XAI : evaluate_risk_factors() — Contribution Score
+    XAI --> ShowResult : displayAssessmentCard()
+    ShowResult --> RecordHistory : Lưu lịch sử phiên
+    RecordHistory --> MainMenu
 ```
 
 ---
