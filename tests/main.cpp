@@ -5,12 +5,6 @@
 #include "test_runner.hpp"
 #include "logger.hpp"
 
-// Unity Build: gộp tất cả các translation unit test vào một file
-#include "test_matrix.cpp"
-#include "test_layers.cpp"
-#include "test_csv_reader.cpp"
-#include "test_evaluator.cpp"
-
 // ── Include riêng cho test DataPipeline & RiskEvaluator ─────────────────────
 #include "riskguard/utils/DataPipeline.hpp"
 #include "riskguard/network/RiskEvaluator.hpp"
@@ -20,7 +14,8 @@
 #include <cmath>
 #include <stdexcept>
 
-using namespace riskguard;
+// Đưa factory functions vào namespace riskguard để gọi được khi file khác (ví dụ: test_evaluator.cpp) include vào Unity Build.
+namespace riskguard {
 
 // ── Hàm tiện ích nội bộ: dựng pipeline đã cấu hình sẵn ─────────────────────
 static DataPipeline make_configured_pipeline() {
@@ -41,6 +36,16 @@ static NeuralNetwork make_network() {
     net.add_layer(std::make_unique<SigmoidLayer>());
     return net;
 }
+
+} // namespace riskguard
+
+using namespace riskguard;
+
+// Unity Build: gộp tất cả các translation unit test vào một file
+#include "test_matrix.cpp"
+#include "test_layers.cpp"
+#include "test_csv_reader.cpp"
+#include "test_evaluator.cpp"
 
 // ============================================================
 //  Test Case 1 — Z-score tại điểm mean → đầu ra phải = 0.0

@@ -3,8 +3,16 @@
 //  Unit Tests cho RiskEvaluator: predict_approval_rate & evaluate_risk_factors
 //  (Tách riêng khỏi tests/main.cpp để bảo vệ tính đóng gói test)
 // ============================================================
+#include "riskguard/network/RiskEvaluator.hpp"
+#include <stdexcept>
+#include <string>
+#include <vector>
+#include <tuple>
+
 // NOTE: File này được gộp qua Unity Build (#include "test_evaluator.cpp")
 //       nên không khai báo lại using namespace hay #include runner.
+
+namespace riskguard {
 
 // ============================================================
 //  Test Case 5 — RiskEvaluator ném std::invalid_argument khi vector rỗng
@@ -64,65 +72,58 @@ public:
     void run_logic() override {
         // ── Nhánh 1: income = 0, debt > 0 → DTI vô hạn ─────────────────────
         {
-            constexpr double raw_income      = 0.0;
-            constexpr double raw_debt        = 50000.0;
-            constexpr double raw_delinquency = 0.0;
-            constexpr double approval_rate   = 0.2;
+            double raw_income      = 0.0;
+            double raw_debt        = 50000.0;
+            double raw_delinquency = 0.0;
+            double approval_rate   = 0.2;
 
-            std::string reason = RiskEvaluator::evaluate_risk_factors(
-                raw_income, raw_debt, raw_delinquency, approval_rate);
+            std::string reason = RiskEvaluator::evaluate_risk_factors(raw_income, raw_debt, raw_delinquency, approval_rate);
             // Kiểm tra ASCII substring tránh lỗi UTF-8 find()
             if (reason.find("DTI") == std::string::npos) {
-                throw std::runtime_error(
-                    "XAI Branch1: DTI vo han khong duoc phat hien. Output: " + reason);
+                throw std::runtime_error("XAI Branch1: DTI vo han khong duoc phat hien. Output: " + reason);
             }
         }
 
         // ── Nhánh 2: DTI > 40% (debt/income > 0.4) → vượt ngưỡng an toàn ──
         {
-            constexpr double raw_income      = 2000.0;
-            constexpr double raw_debt        = 90000.0;   // DTI = 45× >> 0.4
-            constexpr double raw_delinquency = 0.0;
-            constexpr double approval_rate   = 0.2;
+            double raw_income      = 2000.0;
+            double raw_debt        = 90000.0;   // DTI = 45× >> 0.4
+            double raw_delinquency = 0.0;
+            double approval_rate   = 0.2;
 
-            std::string reason = RiskEvaluator::evaluate_risk_factors(
-                raw_income, raw_debt, raw_delinquency, approval_rate);
-            if (reason.find("DTI") == std::string::npos &&
-                reason.find("40%") == std::string::npos) {
-                throw std::runtime_error(
-                    "XAI Branch2: DTI qua cao khong duoc phat hien. Output: " + reason);
+            std::string reason = RiskEvaluator::evaluate_risk_factors(raw_income, raw_debt, raw_delinquency, approval_rate);
+            if (reason.find("DTI") == std::string::npos && reason.find("40%") == std::string::npos) {
+                throw std::runtime_error("XAI Branch2: DTI qua cao khong duoc phat hien. Output: " + reason);
             }
         }
 
         // ── Nhánh 3: Trễ hạn nhiều lần → lịch sử tín dụng xấu ──────────────
         {
-            constexpr double raw_income      = 100000.0;
-            constexpr double raw_debt        = 10000.0;   // DTI = 10% (an toàn)
-            constexpr double raw_delinquency = 12.0;      // 12 lần trễ hạn
-            constexpr double approval_rate   = 0.2;
+            double raw_income      = 100000.0;
+            double raw_debt        = 10000.0;   // DTI = 10% (an toàn)
+            double raw_delinquency = 12.0;      // 12 lần trễ hạn
+            double approval_rate   = 0.2;
 
-            std::string reason = RiskEvaluator::evaluate_risk_factors(
-                raw_income, raw_debt, raw_delinquency, approval_rate);
+            std::string reason = RiskEvaluator::evaluate_risk_factors(raw_income, raw_debt, raw_delinquency, approval_rate);
             // "12" xuất hiện trong chuỗi trả về → xác nhận delinquency count đúng
             if (reason.find("12") == std::string::npos) {
-                throw std::runtime_error(
-                    "XAI Branch3: So lan tre han (12) khong xuat hien. Output: " + reason);
+                throw std::runtime_error("XAI Branch3: So lan tre han (12) khong xuat hien. Output: " + reason);
             }
         }
 
         // ── Nhánh 4: Hồ sơ an toàn (approval_rate >= 0.5) ──────────────────
         {
-            constexpr double raw_income      = 200000.0;
-            constexpr double raw_debt        = 10000.0;   // DTI = 5%
-            constexpr double raw_delinquency = 0.0;
-            constexpr double approval_rate   = 0.85;
+            double raw_income      = 200000.0;
+            double raw_debt        = 10000.0;   // DTI = 5%
+            double raw_delinquency = 0.0;
+            double approval_rate   = 0.85;
 
-            std::string reason = RiskEvaluator::evaluate_risk_factors(
-                raw_income, raw_debt, raw_delinquency, approval_rate);
+            std::string reason = RiskEvaluator::evaluate_risk_factors(raw_income, raw_debt, raw_delinquency, approval_rate);
             if (reason.find("an to") == std::string::npos) {
-                throw std::runtime_error(
-                    "XAI Branch4: Ho so tot khong tra ve 'an toan'. Output: " + reason);
+                throw std::runtime_error("XAI Branch4: Ho so tot khong tra ve 'an toan'. Output: " + reason);
             }
         }
     }
 };
+
+} // namespace riskguard
