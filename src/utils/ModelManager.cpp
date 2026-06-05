@@ -19,7 +19,7 @@ bool ModelManager::saveModel(const std::string& filepath, const NeuralNetwork& m
     out << "    \"debt_mean\": " << pipeline.get_debt_mean() << ",\n";
     out << "    \"debt_std_dev\": " << pipeline.get_debt_std_dev() << ",\n";
     out << "    \"delinquency_mean\": " << pipeline.get_delinquency_mean() << ",\n";
-    out << "    \"delinquency_std_dev\": " << pipeline.get_delinquency_std_dev() << ",\n";
+    out << "    \"delinquency_std_dev\": " << pipeline.get_delinquency_dev() << ",\n";
     out << "    \"age_mean\": " << pipeline.get_age_mean() << ",\n";
     out << "    \"age_std_dev\": " << pipeline.get_age_std_dev() << "\n";
     out << "  },\n";

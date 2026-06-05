@@ -32,7 +32,22 @@ Matrix DataLoader::loadRawCSV(const std::string& filename) {
                 row.push_back(0.0); // Giá trị dự phòng nếu dữ liệu hỏng
             }
         }
-        if (!row.empty()) rawData.push_back(row);
+        
+        if (!row.empty() && row.size() >= 3) {
+            constexpr double EPSILON = 1e-7;
+            double raw_income = row[0];
+            double raw_debt = row[1];
+            double raw_delinquency = row[2];
+            
+            double dti = (raw_income > EPSILON) ? (raw_debt / raw_income) : 999999.0;
+            
+            if (dti > 2.0 || raw_delinquency > 10.0 || raw_income <= EPSILON) {
+                continue; // Lọc ngầm: Bỏ qua dòng dữ liệu rác/vượt ngưỡng
+            }
+            rawData.push_back(row);
+        } else if (!row.empty()) {
+            rawData.push_back(row);
+        }
     }
     file.close();
 

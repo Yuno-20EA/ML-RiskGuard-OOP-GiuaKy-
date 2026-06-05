@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include "riskguard/core/Matrix.hpp"
+#include "riskguard/core/Customer.hpp"
 
 namespace riskguard {
 
@@ -26,12 +27,15 @@ public:
     double get_debt_mean() const { return debt_mean; }
     double get_debt_std_dev() const { return debt_std_dev; }
     double get_delinquency_mean() const { return delinquency_mean; }
-    double get_delinquency_std_dev() const { return delinquency_std_dev; }
+    double get_delinquency_dev() const { return delinquency_dev; }
     double get_age_mean() const { return age_mean; }
     double get_age_std_dev() const { return age_std_dev; }
 
     // Chuẩn hóa Z-score có kẹp biên trong khoảng [-3.0, 3.0]
     // 1. Cho một khách hàng đơn lẻ
+    std::vector<double> transform(const Customer& customer) const;
+    
+    // (Bảo lưu phiên bản cũ để tương thích với test_evaluator.cpp)
     std::vector<double> transform(double income, double debt,
                                   double delinquency, double age) const;
     
@@ -46,7 +50,7 @@ private:
 
     double income_mean{0.0};       double income_std_dev{1.0};
     double debt_mean{0.0};         double debt_std_dev{1.0};
-    double delinquency_mean{0.0};  double delinquency_std_dev{1.0};
+    double delinquency_mean{0.0};  double delinquency_dev{1.0};
     double age_mean{0.0};          double age_std_dev{1.0};
 
     // Hàm nội bộ tính z-score và kẹp biên

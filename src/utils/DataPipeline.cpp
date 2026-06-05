@@ -14,7 +14,7 @@ void DataPipeline::set_debt_params(double mean, double std_dev) {
 
 void DataPipeline::set_delinquency_params(double mean, double std_dev) {
     delinquency_mean = mean;
-    delinquency_std_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
+    delinquency_dev = (std::abs(std_dev) > EPSILON) ? std_dev : 1.0;
 }
 
 void DataPipeline::set_age_params(double mean, double std_dev) {
@@ -66,10 +66,20 @@ std::vector<double> DataPipeline::transform(double income, double debt,
 
     norm_features.push_back(zscore_clip(income, income_mean, income_std_dev));
     norm_features.push_back(zscore_clip(debt, debt_mean, debt_std_dev));
-    norm_features.push_back(zscore_clip(delinquency, delinquency_mean, delinquency_std_dev));
+    norm_features.push_back(zscore_clip(delinquency, delinquency_mean, delinquency_dev));
     norm_features.push_back(zscore_clip(age, age_mean, age_std_dev));
 
     return norm_features;
+}
+
+std::vector<double> DataPipeline::transform(const Customer& customer) const {
+    std::vector<double> features;
+    features.reserve(4);
+    features.push_back((customer.get_income() - income_mean) / income_std_dev);
+    features.push_back((customer.get_debt() - debt_mean) / debt_std_dev);
+    features.push_back((customer.get_delinquency() - delinquency_mean) / delinquency_dev);
+    features.push_back((customer.get_age() - age_mean) / age_std_dev);
+    return features;
 }
 
 Matrix DataPipeline::transform(const Matrix& raw_data) const {
@@ -80,7 +90,7 @@ Matrix DataPipeline::transform(const Matrix& raw_data) const {
     for (int i = 0; i < rows; ++i) {
         if (cols > 0) result(i, 0) = zscore_clip(raw_data(i, 0), income_mean, income_std_dev);
         if (cols > 1) result(i, 1) = zscore_clip(raw_data(i, 1), debt_mean, debt_std_dev);
-        if (cols > 2) result(i, 2) = zscore_clip(raw_data(i, 2), delinquency_mean, delinquency_std_dev);
+        if (cols > 2) result(i, 2) = zscore_clip(raw_data(i, 2), delinquency_mean, delinquency_dev);
         if (cols > 3) result(i, 3) = zscore_clip(raw_data(i, 3), age_mean, age_std_dev);
         
         // Sao chép nguyên si các cột nhãn (nếu có)

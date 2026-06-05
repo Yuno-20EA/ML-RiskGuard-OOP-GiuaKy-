@@ -7,6 +7,7 @@
 #include "riskguard/utils/DataPipeline.hpp"
 #include "riskguard/utils/DataLoader.hpp"
 #include "riskguard/utils/ModelManager.hpp"
+#include "riskguard/core/Customer.hpp"
 #include "riskguard/network/NeuralNetwork.hpp"
 #include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/layers/LinearLayer.hpp"
@@ -268,7 +269,7 @@ static void run_single_assessment(Dashboard& db,
                   << (dti > 40.0 ? ansi::RED : ansi::GREEN)
                   << std::fixed << std::setprecision(1) << dti << "%\n" << ansi::RESET;
 
-        std::cout << "\n" << ansi::CYAN << "  [Y/n] Xác nhận và tiến hành thẩm định? " << ansi::RESET;
+    std::cout << "\n" << ansi::CYAN << "  [Y/n] Xác nhận và tiến hành thẩm định? " << ansi::RESET;
         char confirm;
         std::cin >> confirm;
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -279,19 +280,39 @@ static void run_single_assessment(Dashboard& db,
         break;
     }
 
-    std::vector<double> features = pipeline.transform(income, debt,
-                                                       delinquency,
-                                                       static_cast<double>(age));
+    double risk_prob;
+    std::string decision;
+    std::string reason;
 
-    run_cognitive_assessment(features, verbose);
+    double dti = (income > 1e-7) ? (debt / income) : 999999.0;
 
-    double approval_rate = RiskEvaluator::predict_approval_rate(features, model);
-    double risk_prob     = 1.0 - approval_rate;
+    // PRE-FILTER LOGIC (Hard rules)
+    if (dti > 0.4 || delinquency > 0 || income <= 1e-7) {
+        risk_prob = 1.0;
+        decision = "TỪ CHỐI";
+        if (income <= 1e-7) {
+            reason = "Từ chối tự động: Thu nhập bằng 0 hoặc quá thấp.";
+        } else if (dti > 0.4) {
+            reason = "Từ chối tự động: Tỷ lệ Nợ/Thu nhập (DTI) vượt ngưỡng an toàn (40%).";
+        } else {
+            reason = "Từ chối tự động: Có lịch sử trễ hạn tín dụng.";
+        }
+        db.displayAssessmentCard(risk_prob, reason);
+    } else {
+        // AI EVALUATION LOGIC
+        Customer customer(income, debt, delinquency, age);
+        std::vector<double> features = pipeline.transform(customer);
 
-    std::string reason   = RiskEvaluator::evaluate_risk_factors(income, debt, delinquency, approval_rate);
-    std::string decision = (approval_rate >= 0.5) ? "DUYỆT" : "TỪ CHỐI";
+        run_cognitive_assessment(features, verbose);
 
-    db.displayAssessmentCard(risk_prob, reason);
+        double approval_rate = RiskEvaluator::predict_approval_rate(features, model);
+        risk_prob     = 1.0 - approval_rate;
+
+        reason   = RiskEvaluator::evaluate_risk_factors(income, debt, delinquency, approval_rate);
+        decision = (approval_rate >= 0.5) ? "DUYỆT" : "TỪ CHỐI";
+
+        db.displayAssessmentCard(risk_prob, reason);
+    }
 
     // Ghi vào lịch sử phiên
     history.push_back({
