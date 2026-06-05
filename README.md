@@ -410,8 +410,6 @@ Dự án được phát triển và phối hợp vận hành bởi các thành v
   - Tích hợp **Runtime Training**: mô hình huấn luyện tự động 50 Epochs từ `dataset.csv` ngay khi khởi động, kèm thanh tiến trình hoạt hoạ.
   - Triển khai **Explainable AI (XAI)** trong `RiskEvaluator::evaluate_risk_factors()`: tính Contribution Score từ trọng số lớp 1 của mạng để xác định thuộc tính gây rủi ro cao nhất.
   - Bổ sung `NeuralNetwork::get_first_layer_parameters()` để XAI có thể đọc trực tiếp tham số mạng.
-  - Việt hoá 100% giao diện CLI: tất cả các chuỗi output, thông báo lỗi, nhãn kết quả.
-  - Cập nhật giới hạn nhập liệu: Thu nhập tối đa 100 Tỷ VND, Dư nợ 20 Tỷ VND, Tuổi tối đa 200.
   - Sửa lỗi **Absolute Path** cho `dataset.csv` bằng macro CMake `RISKGUARD_PROJECT_ROOT`, đảm bảo chương trình chạy đúng dù được gọi từ bất kỳ thư mục nào.
   - Nâng cấp bộ Unit Test lên 11 test cases, bao gồm `XAIEvaluationTest` kiểm tra tính đúng đắn của thuật toán giải thích.
 
