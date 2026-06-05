@@ -18,29 +18,53 @@ Matrix DataLoader::loadRawCSV(const std::string& filename) {
     std::vector<std::vector<double>> labels_matrix;
     
     std::string line, val;
-    bool isHeader = true; // Bỏ qua dòng tiêu đề
+    
+    int line_count = 0;
+    int skip_size = 0;
+    int skip_prune = 0;
+    int skip_parse = 0;
 
     while (std::getline(file, line)) { 
-        if (line.empty()) continue; 
+        if (line_count == 0) { 
+            line_count++; 
+            continue; 
+        }
         
-        if (isHeader) { isHeader = false; continue; }
+        if (line.empty()) {
+            line_count++;
+            continue; 
+        }
         
         std::stringstream ss(line);
         std::vector<double> row_data;
+        bool parse_error = false;
+        
         while (std::getline(ss, val, ',')) {
             try {
                 row_data.push_back(std::stod(val));
             } catch (const std::exception& e) {
-                row_data.push_back(0.0); // Giá trị dự phòng nếu dữ liệu hỏng
+                parse_error = true;
+                break; // Lỗi parse, dừng xử lý dòng này ngay lập tức
             }
         }
         
-        // 1. BỔ SUNG NGƯỠNG CHẶN BIÊN AN TOÀN TRONG VÒNG LẶP ĐỌC CSV
-        if (row_data.empty() || row_data.size() < 5) {
-            continue; // Bỏ qua ngay lập tức dòng tiêu đề, dòng rác hoặc dòng trống ở cuối file
+        if (parse_error) {
+            skip_parse++;
+            line_count++;
+            continue;
         }
 
-        // 2. ĐỒNG BỘ LOGIC CẮT TỈA (DATA PRUNING) VÀ NẠP MA TRẬN
+        // Ghi Log chi tiết cho 5 dòng ĐẦU TIÊN của dữ liệu
+        if (line_count <= 5) {
+            std::cout << "[LOG] Dòng " << line_count << " - Kích thước row_data: " << row_data.size() << "\n";
+        }
+        
+        if (row_data.empty() || row_data.size() < 5) {
+            skip_size++;
+            line_count++;
+            continue;
+        }
+
         constexpr double EPSILON = 1e-7;
         double raw_income = row_data[0];
         double raw_debt = row_data[1];
@@ -51,16 +75,31 @@ Matrix DataLoader::loadRawCSV(const std::string& filename) {
         double dti = (raw_income > EPSILON) ? (raw_debt / raw_income) : 999999.0;
         
         if (dti > 2.0 || raw_delinquency > 10.0 || raw_income <= EPSILON) {
-            continue; // Loại bỏ hồ sơ nhiễu đồng bộ
+            if (line_count <= 5) {
+                std::cout << "[LOG] -> Bị Pruned | Income: " << raw_income 
+                          << ", Debt: " << raw_debt 
+                          << ", Delinquency: " << raw_delinquency 
+                          << ", DTI: " << dti << "\n";
+            }
+            skip_prune++;
+            line_count++;
+            continue;
         }
 
         // Chỉ khi vượt qua bộ lọc trên mới thực hiện push dữ liệu
         features_matrix.push_back({raw_income, raw_debt, raw_delinquency, raw_age});
         labels_matrix.push_back({label});
+        
+        line_count++;
     }
     file.close();
 
-    // 3. IN ĐỊNH LƯỢNG DEBUG KÍCH THƯỚC
+    // 5. IN ĐỊNH LƯỢNG DEBUG KÍCH THƯỚC VÀ KIỂM TOÁN
+    std::cout << "[AUDIT] Tổng số dòng đọc được: " << line_count << "\n"
+              << " -> Bị loại do thiếu cột (<5): " << skip_size << "\n"
+              << " -> Bị loại do lỗi parse số: " << skip_parse << "\n"
+              << " -> Bị loại do bộ lọc cực trị (Pruning): " << skip_prune << "\n";
+
     std::cout << "[DEBUG] DataLoader Matrix Dimensions - X: " << features_matrix.size() 
               << "x" << (features_matrix.empty() ? 0 : features_matrix[0].size()) 
               << " | Y: " << labels_matrix.size() << "x1\n";
