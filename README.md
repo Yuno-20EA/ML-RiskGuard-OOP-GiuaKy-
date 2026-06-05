@@ -123,19 +123,19 @@ Sơ đồ dưới đây mô tả toàn bộ luồng từ lúc khởi động đ�
 
 ```mermaid
 stateDiagram-v2
-    [*] --> LoadCSV : DataLoader::loadRawCSV()
+    [*] --> LoadCSV : DataLoader.loadRawCSV()
 
     state LoadCSV {
         ReadFile --> BuildRawMatrix : Bỏ qua header, parse double
     }
 
-    LoadCSV --> FitPipeline : DataPipeline::fit()
+    LoadCSV --> FitPipeline : DataPipeline.fit()
 
     state FitPipeline {
         CalcMean --> CalcStdDev : Quét toàn bộ 28,638 bản ghi
     }
 
-    FitPipeline --> Normalize : DataPipeline::transform(Matrix)
+    FitPipeline --> Normalize : DataPipeline.transform()
 
     state TrainingLoop {
         direction LR
@@ -144,8 +144,8 @@ stateDiagram-v2
         BackwardPass --> UpdateWeights
     }
 
-    Normalize --> CheckModel : ModelManager::loadModel()
-    CheckModel --> TrainingLoop : Không tìm thấy model.json (200 Epochs + Early Stopping)
+    Normalize --> CheckModel : ModelManager.loadModel()
+    CheckModel --> TrainingLoop : Không tìm thấy model (200 Epochs + Early Stopping)
     CheckModel --> MainMenu : Đã nạp thành công từ model.json
     TrainingLoop --> MainMenu : Mô hình sẵn sàng
 
@@ -156,10 +156,10 @@ stateDiagram-v2
     }
 
     MainMenu --> InputProfile
-    InputProfile --> ZScoreClipping : pipeline.transform(vector)
+    InputProfile --> ZScoreClipping : pipeline.transform()
     ZScoreClipping --> AIAnalysis : Staged AI Animation (3 giai đoạn)
-    AIAnalysis --> Prediction : RiskEvaluator::predict_approval_rate()
-    Prediction --> XAI : evaluate_risk_factors() — Contribution Score
+    AIAnalysis --> Prediction : RiskEvaluator.predict_approval_rate()
+    Prediction --> XAI : evaluate_risk_factors() - Contribution Score
     XAI --> ShowResult : displayAssessmentCard()
     ShowResult --> RecordHistory : Lưu lịch sử phiên
     RecordHistory --> MainMenu
