@@ -135,23 +135,10 @@ static void run_single_assessment(Dashboard& db, const DataPipeline& pipeline, N
 
     run_cognitive_assessment(features);
 
-    double default_prob = RiskEvaluator::predict_approval_rate(features, model);
-    double risk_prob = default_prob; // Xác suất rủi ro chính là xác suất Default
-    double approval_rate = 1.0 - default_prob; // Tỷ lệ duyệt tỷ lệ nghịch với rủi ro
+    double approval_rate = RiskEvaluator::predict_approval_rate(features, model);
+    double risk_prob = 1.0 - approval_rate;
     
-    // Sinh lý do động (Dynamic Explainability) dựa trên dữ liệu thô và XAI
-    std::string reason;
-    if (risk_prob >= 0.5) {
-        if (income > 0 && debt > income * 0.4) {
-            reason = "Tỷ lệ nợ trên thu nhập (DTI) vượt ngưỡng an toàn (>40%).";
-        } else if (delinquency > 0) {
-            reason = "Có lịch sử trễ hạn thanh toán, rủi ro tín dụng cao.";
-        } else {
-            reason = RiskEvaluator::evaluate_risk_factors(features, model, risk_prob);
-        }
-    } else {
-        reason = "Hồ sơ tín dụng an toàn. Các chỉ số đều ở mức tốt.";
-    }
+    std::string reason = RiskEvaluator::evaluate_risk_factors(income, debt, delinquency, approval_rate);
 
     // Hiển thị trực tiếp risk_prob cho người dùng dễ hiểu
     db.displayAssessmentCard(risk_prob, reason);
