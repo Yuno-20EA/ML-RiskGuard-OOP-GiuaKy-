@@ -1,0 +1,53 @@
+# ==========================================================================
+#  Doxyfile — RiskGuard ML Framework v2.1
+#  Tạo tài liệu API tự động từ source code
+#  Sử dụng: doxygen Doxyfile
+# ==========================================================================
+
+PROJECT_NAME           = "RiskGuard ML Framework"
+PROJECT_NUMBER         = 2.1.0
+PROJECT_BRIEF          = "OOP Neural Network Credit Risk Assessment System"
+
+OUTPUT_DIRECTORY       = docs
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = Vietnamese
+
+# ── Nguồn đầu vào ───────────────────────────────────────────────────────────
+INPUT                  = include src app
+RECURSIVE              = YES
+FILE_PATTERNS          = *.hpp *.cpp *.h
+
+EXCLUDE                = build tests
+
+# ── Trích xuất toàn bộ dù không có Doxygen comment ──────────────────────────
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+
+# ── Đầu ra HTML ─────────────────────────────────────────────────────────────
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_COLORSTYLE        = DARK
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+
+# ── Tắt LaTeX (không cần PDF) ────────────────────────────────────────────────
+GENERATE_LATEX         = NO
+
+# ── Biểu đồ phụ thuộc (cần Graphviz/dot) ────────────────────────────────────
+HAVE_DOT               = NO
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+
+# ── Tuỳ chỉnh hiển thị ───────────────────────────────────────────────────────
+SHOW_FILES             = YES
+SHOW_NAMESPACES        = YES
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+ALWAYS_DETAILED_SEC    = NO
+SORT_MEMBER_DOCS       = YES
+WARN_IF_UNDOCUMENTED   = NO
+
+# ── Encoding ─────────────────────────────────────────────────────────────────
+DOXYFILE_ENCODING      = UTF-8
+INPUT_ENCODING         = UTF-8

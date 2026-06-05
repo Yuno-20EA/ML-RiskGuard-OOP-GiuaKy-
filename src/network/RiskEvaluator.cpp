@@ -1,8 +1,7 @@
 #include "riskguard/network/RiskEvaluator.hpp"
 #include "riskguard/core/Matrix.hpp"
 #include <stdexcept>
-#include <algorithm>
-#include <iostream>
+#include <string>
 
 namespace riskguard {
 

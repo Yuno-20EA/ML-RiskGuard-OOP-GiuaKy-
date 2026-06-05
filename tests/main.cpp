@@ -9,6 +9,7 @@
 #include "test_matrix.cpp"
 #include "test_layers.cpp"
 #include "test_csv_reader.cpp"
+#include "test_evaluator.cpp"
 
 // ── Include riêng cho test DataPipeline & RiskEvaluator ─────────────────────
 #include "riskguard/utils/DataPipeline.hpp"
@@ -107,83 +108,8 @@ public:
     }
 };
 
-// ============================================================
-//  Test Case 5 — RiskEvaluator ném std::invalid_argument khi vector rỗng
-// ============================================================
-class EmptyFeatureExceptionTest : public TestCase {
-public:
-    EmptyFeatureExceptionTest() : TestCase("RiskEvaluator", "EmptyFeatureExceptionTest") {}
-    void run_logic() override {
-        auto model = make_network();
-        std::vector<double> empty;
-        bool caught = false;
-        try {
-            RiskEvaluator::predict_approval_rate(empty, model);
-        } catch (const std::invalid_argument&) {
-            caught = true;
-        } catch (...) {
-            throw std::runtime_error("Sai loai ngoai le — ky vong std::invalid_argument");
-        }
-        if (!caught)
-            throw std::runtime_error("RiskEvaluator khong nem ngoai le khi vector rong");
-    }
-};
-
-// ============================================================
-//  Test Case 6 — Đầu ra RiskEvaluator luôn nằm trong [0.0, 1.0]
-// ============================================================
-class OutputRangeTest : public TestCase {
-public:
-    OutputRangeTest() : TestCase("RiskEvaluator", "OutputRangeTest") {}
-    void run_logic() override {
-        auto pipeline = make_configured_pipeline();
-        auto model    = make_network();
-
-        // Thử nhiều tổ hợp đặc trưng khác nhau
-        const std::vector<std::tuple<double,double,double,double>> samples = {
-            {70000.0, 15000.0, 0.5,  45.0},  // Khách hàng trung bình
-            {10000.0, 90000.0, 80.0, 25.0},  // Rủi ro rất cao
-            {200000.0, 500.0,  0.0,  60.0},  // Rủi ro thấp
-        };
-
-        for (const auto& [inc, dbt, del, age] : samples) {
-            auto f = pipeline.transform(inc, dbt, del, age);
-            double prob = RiskEvaluator::predict_approval_rate(f, model);
-            if (prob < 0.0 || prob > 1.0)
-                throw std::runtime_error("Xac suat ngoai khoang [0.0, 1.0]: " +
-                                         std::to_string(prob));
-        }
-    }
-};
-
-// ============================================================
-//  Test Case 7 — Kiểm tra thuật toán giải thích XAI
-// ============================================================
-class XAIEvaluationTest : public TestCase {
-public:
-    XAIEvaluationTest() : TestCase("RiskEvaluator", "XAIEvaluationTest") {}
-    void run_logic() override {
-        auto model = make_network();
-        std::vector<double> features = {2.0, 3.0, 1.0, 0.5}; // Đặc trưng giả định
-        
-        // Cố tình đẩy trọng số lớp đầu tiên của thuộc tính Debt (index 1) lên mức siêu cao
-        auto params = model.get_first_layer_parameters();
-        if (!params.empty()) {
-            Matrix* weights = params[0];
-            for (int j = 0; j < weights->get_cols(); ++j) {
-                (*weights)(1, j) = 10.0; // Làm cho nợ có lực đóng góp mạnh nhất
-                (*weights)(0, j) = 0.1;
-                (*weights)(2, j) = 0.1;
-                (*weights)(3, j) = 0.1;
-            }
-        }
-        
-        std::string reason = RiskEvaluator::evaluate_risk_factors(features, model, 0.8);
-        if (reason.find("Dư nợ hiện tại quá cao") == std::string::npos) {
-            throw std::runtime_error("XAI không tìm ra nguyên nhân Dư nợ cao. Output: " + reason);
-        }
-    }
-};
+// NOTE: EmptyFeatureExceptionTest, OutputRangeTest, XAIEvaluationTest
+// đã được chuyển sang tests/test_evaluator.cpp (Unity Build).
 
 // ============================================================
 //  Test Case 8 — Kiểm tra hàm DataPipeline::fit

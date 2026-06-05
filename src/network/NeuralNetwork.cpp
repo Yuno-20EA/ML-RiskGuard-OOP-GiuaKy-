@@ -61,9 +61,10 @@ Matrix NeuralNetwork::calculateBCEGradient(const Matrix& predictions, const Matr
             double y_true = targets(i, j);
 
             y_pred = std::max(epsilon, std::min(1.0 - epsilon, y_pred));
+            // Đạo hàm BCE chuẩn: (pred - true) / (pred * (1 - pred))
+            // Không chia batch_size lần 2 — Loss đã chia rồi
             double denominator = std::max(y_pred * (1.0 - y_pred), epsilon);
-            gradient(i, j) = (y_pred - y_true) / denominator;
-            gradient(i, j) /= batch_size;
+            gradient(i, j) = (y_pred - y_true) / (denominator * batch_size);
         }
     }
     return gradient;

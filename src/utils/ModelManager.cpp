@@ -11,6 +11,8 @@ bool ModelManager::saveModel(const std::string& filepath, const NeuralNetwork& m
     if (!out.is_open()) return false;
 
     out << "{\n";
+    out << "  \"version\": \"2.1.0\",\n";
+    out << "  \"arch\": \"4-8-1\",\n";
     out << "  \"pipeline\": {\n";
     out << "    \"income_mean\": " << pipeline.get_income_mean() << ",\n";
     out << "    \"income_std_dev\": " << pipeline.get_income_std_dev() << ",\n";
@@ -70,6 +72,24 @@ bool ModelManager::loadModel(const std::string& filepath, NeuralNetwork& model, 
     std::stringstream buffer;
     buffer << in.rdbuf();
     std::string content = buffer.str();
+
+    // ── Kiểm tra version & arch compatibility ──────────────────────────────
+    // Nếu arch không khớp → model.json lỗi thời, cần huấn luyện lại
+    auto extract_string = [&](const std::string& key) -> std::string {
+        size_t pos = content.find('"' + key + "\":");
+        if (pos == std::string::npos) return {};
+        size_t q1 = content.find('"', pos + key.size() + 3);
+        if (q1 == std::string::npos) return {};
+        size_t q2 = content.find('"', q1 + 1);
+        if (q2 == std::string::npos) return {};
+        return content.substr(q1 + 1, q2 - q1 - 1);
+    };
+
+    std::string saved_arch = extract_string("arch");
+    if (!saved_arch.empty() && saved_arch != "4-8-1") {
+        // Kiến trúc không khớp → từ chối nạp, buộc huấn luyện lại
+        return false;
+    }
 
     auto extract_double = [&](const std::string& key) -> double {
         size_t pos = content.find("\"" + key + "\":");
